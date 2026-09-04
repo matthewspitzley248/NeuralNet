@@ -24,9 +24,21 @@
     <ClInclude Include="include\NeuralNet\Layers\Layers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\NeuralNet\Layers\MaxPool2D.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Tensor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\NeuralNet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Tensor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Layers\Conv2D.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

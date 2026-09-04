@@ -102,6 +102,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Users\matth\repos\NeuralNet\NeuralNet\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -125,10 +127,14 @@
   <ItemGroup>
     <ClInclude Include="include\NeuralNet\Layers\Conv2D.h" />
     <ClInclude Include="include\NeuralNet\Layers\Layers.h" />
+    <ClInclude Include="include\NeuralNet\Layers\MaxPool2D.h" />
     <ClInclude Include="include\NeuralNet\NeuralNet.h" />
+    <ClInclude Include="include\NeuralNet\Tensor.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Layers\Conv2D.cpp" />
     <ClCompile Include="src\NeuralNet.cpp" />
+    <ClCompile Include="src\Tensor.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
