@@ -1,14 +1,42 @@
 // NeuralNet.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
+#pragma once
 
 #include <iostream>
+#include <NeuralNet/NeuralNet.h>
+#include <filesystem>
 
-using namespace std;
 
-int main()
+
+
+namespace NN
 {
-    cout << "Hello World!\n";
+    NeuralNet::NeuralNet(unsigned int seed)
+        : seed_(seed),
+        randomGenerator_(seed)
+    {
+    }
+
+    void NeuralNet::Sequential()
+    {
+        model_ = std::make_unique<Models::Sequential>();
+    }
 }
+
+
+
+//int main()
+//{
+//    cout << "Hello World!\n";
+//
+//    ImageLoader imgLoader = ImageLoader();
+//
+//    std::cout << std::filesystem::current_path() << '\n';
+//
+//    Tensor image = imgLoader.Load(R"(Datasets\Zero_full (1).jpg)");
+//
+//    NeuralNet::NeuralNet model = NeuralNet();
+//}
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
 // Debug program: F5 or Debug > Start Debugging menu

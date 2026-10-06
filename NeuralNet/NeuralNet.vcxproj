@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -125,14 +125,28 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\NeuralNet\ImageLoader.h" />
+    <ClInclude Include="include\NeuralNet\Layers.h" />
     <ClInclude Include="include\NeuralNet\Layers\Conv2D.h" />
-    <ClInclude Include="include\NeuralNet\Layers\Layers.h" />
+    <ClInclude Include="include\NeuralNet\Layers\Dense.h" />
+    <ClInclude Include="include\NeuralNet\Layers\Flatten.h" />
+    <ClInclude Include="include\NeuralNet\Layers\Layer.h" />
     <ClInclude Include="include\NeuralNet\Layers\MaxPool2D.h" />
+    <ClInclude Include="include\NeuralNet\Models.h" />
+    <ClInclude Include="include\NeuralNet\Models\Model.h" />
+    <ClInclude Include="include\NeuralNet\Models\Sequential.h" />
     <ClInclude Include="include\NeuralNet\NeuralNet.h" />
     <ClInclude Include="include\NeuralNet\Tensor.h" />
+    <ClInclude Include="include\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="src\ImageLoader.cpp" />
     <ClCompile Include="src\Layers\Conv2D.cpp" />
+    <ClCompile Include="src\Layers\Dense.cpp" />
+    <ClCompile Include="src\Layers\Flatten.cpp" />
+    <ClCompile Include="src\Models\Model.cpp" />
+    <ClCompile Include="src\Models\Sequential.cpp" />
     <ClCompile Include="src\NeuralNet.cpp" />
     <ClCompile Include="src\Tensor.cpp" />
   </ItemGroup>

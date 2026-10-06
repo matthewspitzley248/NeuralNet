@@ -1,19 +1,32 @@
 #pragma once
 
-#include "Layers.h"
+#include <NeuralNet/Layers/Layer.h>
 #include <utility>
 
-namespace NeuralNet::Layers
+namespace NN::Layers
 {
-    class Conv2D : public Layers
+    enum class Padding
+    {
+        Valid,
+        Same
+    };
+
+    class Conv2D : public Layer
     {
     public:
         Conv2D(
-            int filers,
+            int filters,
             std::pair<int, int> kernalSize,
-            std::pair<int, int> strides = {1, 1}
+            std::pair<int, int> strides = {1, 1},
+            Padding padding = Padding::Valid
         );
-    protected:
 
+        Tensor Run(const Tensor& input) override;
+         
+    protected:
+        int filters_;
+        std::pair<int, int> kernelSize_;
+        std::pair<int, int> strides_;
+        Padding padding_;
     };
 }

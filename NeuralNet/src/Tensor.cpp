@@ -1,7 +1,6 @@
 #include <NeuralNet/Tensor.h>
-#include <stdexcept>
 
-namespace NeuralNet 
+namespace NN 
 {
 	/// <summary>
 	/// creates a new tensor object of the given shape
@@ -51,6 +50,11 @@ namespace NeuralNet
 		return data_.at(returnIndex);
 	}
 
+	float& Tensor::At(const int y, const int x, const int z)
+	{
+		return data_.at(y + (x * 3) + (z * 9));
+	}
+
 	/// <summary>
 	/// returns the shape of the tensor
 	/// </summary>
@@ -58,5 +62,10 @@ namespace NeuralNet
 	const std::vector<int>& Tensor::GetShape() const
 	{
 		return shape_;
+	}
+
+	const size_t& Tensor::GetSize() const
+	{
+		return data_.size();
 	}
 }

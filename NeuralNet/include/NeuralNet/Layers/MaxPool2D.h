@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Layers.h"
+#include <NeuralNet/Layers/Layer.h>
 
-namespace NeuralNet::Layers
+namespace NN::Layers
 {
-    class MaxPool2D : public Layers
+    class MaxPool2D : public Layer
     {
     public:
     };

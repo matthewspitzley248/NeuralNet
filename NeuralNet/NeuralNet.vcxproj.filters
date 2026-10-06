@@ -21,13 +21,37 @@
     <ClInclude Include="include\NeuralNet\NeuralNet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\NeuralNet\Layers\Layers.h">
+    <ClInclude Include="include\NeuralNet\Layers\Layer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\NeuralNet\Layers\MaxPool2D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\NeuralNet\Tensor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\ImageLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\stb_image.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Layers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Layers\Flatten.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Layers\Dense.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Models.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Models\Model.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Models\Sequential.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -39,6 +63,24 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Layers\Conv2D.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ImageLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Layers\Dense.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Models\Model.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Models\Sequential.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Layers\Flatten.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
