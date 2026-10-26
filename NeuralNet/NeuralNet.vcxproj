@@ -125,6 +125,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\NeuralNet\Activation.h" />
+    <ClInclude Include="include\NeuralNet\ImageDataGenerator.h" />
     <ClInclude Include="include\NeuralNet\ImageLoader.h" />
     <ClInclude Include="include\NeuralNet\Layers.h" />
     <ClInclude Include="include\NeuralNet\Layers\Conv2D.h" />
@@ -132,23 +134,39 @@
     <ClInclude Include="include\NeuralNet\Layers\Flatten.h" />
     <ClInclude Include="include\NeuralNet\Layers\Layer.h" />
     <ClInclude Include="include\NeuralNet\Layers\MaxPool2D.h" />
+    <ClInclude Include="include\NeuralNet\Loss.h" />
     <ClInclude Include="include\NeuralNet\Models.h" />
     <ClInclude Include="include\NeuralNet\Models\Model.h" />
     <ClInclude Include="include\NeuralNet\Models\Sequential.h" />
     <ClInclude Include="include\NeuralNet\NeuralNet.h" />
+    <ClInclude Include="include\NeuralNet\Optimizer.h" />
     <ClInclude Include="include\NeuralNet\Tensor.h" />
+    <ClInclude Include="include\NeuralNet\WorkerPool.h" />
     <ClInclude Include="include\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="include\NeuralNet\Layers\Layer.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="src\Activation.cpp" />
+    <ClCompile Include="src\ImageDataGenerator.cpp" />
     <ClCompile Include="src\ImageLoader.cpp" />
     <ClCompile Include="src\Layers\Conv2D.cpp" />
     <ClCompile Include="src\Layers\Dense.cpp" />
     <ClCompile Include="src\Layers\Flatten.cpp" />
+    <ClCompile Include="src\Loss.cpp" />
     <ClCompile Include="src\Models\Model.cpp" />
     <ClCompile Include="src\Models\Sequential.cpp" />
     <ClCompile Include="src\NeuralNet.cpp" />
+    <ClCompile Include="src\Optimizer.cpp" />
     <ClCompile Include="src\Tensor.cpp" />
+    <ClCompile Include="src\WorkerPool.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Datasets\HandwrittenDigits0-9.zip" />
+    <None Include="Datasets\MNIST.zip" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Datasets\Zero_full (1).jpg" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

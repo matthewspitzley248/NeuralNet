@@ -4,7 +4,7 @@
 
 namespace NN::Layers
 {
-    class MaxPool2D : public Layer
+    class MaxPool2D //: public Layer
     {
     public:
     };

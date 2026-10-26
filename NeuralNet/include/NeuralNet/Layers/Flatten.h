@@ -4,13 +4,33 @@
 
 namespace NN::Layers
 {
+    struct FlattenContext : LayerContext
+    {
+        Tensor inputShape;
+    };
+
     class Flatten : public Layer
     {
     public:
         Flatten();
 
-        Tensor Run(const Tensor& input) override;
-    protected:
+        unique_ptr<LayerContext> CreateContext() const override;
 
+        void Initialize(std::mt19937& generator, const std::vector<size_t>& inputShape) override;
+
+        std::vector<size_t> GetOutputShape(const std::vector<size_t>& inputShape) override;
+
+        Tensor Run(const Tensor& input, LayerContext& context) override;
+
+        Tensor Backpropagate(const Tensor& gradient, LayerContext& context) override;
+
+        void ApplyGradients(Optimizer& optimizer, int batchSize) override;
+
+        void ResetGradients(LayerContext& context) override;
+
+        void AccumulateGradients(LayerContext& context) override;
+
+    protected:
+        std::vector<size_t> inputShape_;
     };
 }

@@ -19,7 +19,7 @@ namespace NN
 
     void NeuralNet::Sequential()
     {
-        model_ = std::make_unique<Models::Sequential>();
+        //model_ = std::make_unique<Models::Sequential>();
     }
 }
 

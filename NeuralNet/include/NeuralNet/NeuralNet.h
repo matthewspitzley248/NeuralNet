@@ -7,7 +7,10 @@
 #include <NeuralNet/Models.h>
 #include <NeuralNet/Tensor.h>
 #include <NeuralNet/ImageLoader.h>
-#include <NeuralNet/Models/Sequential.h>
+#include <NeuralNet/ImageDataGenerator.h>
+#include <NeuralNet/Loss.h>
+#include <NeuralNet/Activation.h>
+#include <NeuralNet/WorkerPool.h>
 
 
 namespace NN

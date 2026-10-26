@@ -2,7 +2,7 @@
 
 namespace NN::Layers
 {
-    Conv2D::Conv2D(
+    /*Conv2D::Conv2D(
         int filters,
         std::pair<int, int> kernelSize,
         std::pair<int, int> strides,
@@ -15,9 +15,18 @@ namespace NN::Layers
         padding_ = padding;
     }
 
+    void Conv2D::Initialize(std::mt19937& generator, const std::vector<int>& inputShape)
+    {
+    }
+
+    std::vector<int> Conv2D::GetOutputShape(const std::vector<int>& inputShape)
+    {
+        return std::vector<int>();
+    }
+
     Tensor Conv2D::Run(const Tensor& input)
     {
 
         return input;
-    }
+    }*/
 }

@@ -5,7 +5,7 @@
 
 namespace NN::Layers
 {
-    enum class Padding
+    /*enum class Padding
     {
         Valid,
         Same
@@ -21,6 +21,10 @@ namespace NN::Layers
             Padding padding = Padding::Valid
         );
 
+        void Initialize(std::mt19937& generator, const std::vector<int>& inputShape) override;
+
+        std::vector<int> GetOutputShape(const std::vector<int>& inputShape) override;
+
         Tensor Run(const Tensor& input) override;
          
     protected:
@@ -28,5 +32,5 @@ namespace NN::Layers
         std::pair<int, int> kernelSize_;
         std::pair<int, int> strides_;
         Padding padding_;
-    };
+    };*/
 }

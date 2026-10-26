@@ -54,6 +54,21 @@
     <ClInclude Include="include\NeuralNet\Models\Sequential.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\NeuralNet\ImageDataGenerator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Loss.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Activation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\Optimizer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NeuralNet\WorkerPool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\NeuralNet.cpp">
@@ -83,5 +98,36 @@
     <ClCompile Include="src\Layers\Flatten.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="include\NeuralNet\Layers\Layer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ImageDataGenerator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Loss.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Activation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Optimizer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\WorkerPool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Datasets\HandwrittenDigits0-9.zip">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Datasets\MNIST.zip">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Datasets\Zero_full (1).jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

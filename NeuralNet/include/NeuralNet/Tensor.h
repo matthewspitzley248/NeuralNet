@@ -9,17 +9,26 @@ namespace NN
     {
     public:
         Tensor() = default;
-        Tensor(std::vector<int> shape);
+        Tensor(std::vector<size_t> shape);
 
-        float& At(const std::vector<int>& index);
-        float& At(const int y, const int x, const int z);
+        float& At(const std::vector<size_t>& index);
+        //float& At(const int y, const int x, const int z);
+        float& At(size_t index);
+        float& AtFlat(size_t index);
 
-        const std::vector<int>& GetShape() const;
+        const float& At(const std::vector<size_t>& index) const;
+        //const float& At(const int y, const int x, const int z) const;
+        const float& At(size_t index) const;
+        const float& AtFlat(size_t index) const;
+
+        const std::vector<size_t>& GetShape() const;
         const size_t& GetSize() const;
+
+        void SetShape(const std::vector<size_t>& newShape);
 
     protected:
 
         std::vector<float> data_;
-        std::vector<int> shape_;
+        std::vector<size_t> shape_;
     };
 }
