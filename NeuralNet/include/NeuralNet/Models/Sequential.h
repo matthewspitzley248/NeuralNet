@@ -2,14 +2,21 @@
 
 #include <NeuralNet/Models/Model.h>
 #include <iostream>
+#include <cstdio>
+#include <chrono>
+#include <algorithm>
 
 using namespace std;
+using Clock = std::chrono::steady_clock;
 
 namespace NN::Models
 {
     struct WorkerContext
     {
         vector<unique_ptr<Layers::LayerContext>> layerContexts;
+
+        Tensor scratchBufferA;
+        Tensor scratchBufferB;
     };
 
     class Sequential : public Model
@@ -45,6 +52,8 @@ namespace NN::Models
         void CreateWorkers(int workerCount);
         void ResetWorkerGradients();
         void AccumulateWorkerGradients();
+
+        void PrintProgress(size_t currentBatch, size_t totalBatches, double averageBatchSeconds);
 
         //Optimizer optimizer_;
         float learningRate_;

@@ -35,7 +35,7 @@ namespace NN
         void Stop();
 
         // Add jobs to the shared queue.
-        void SubmitJobs(std::vector<Job> jobs);
+        void SubmitJobs(vector<Job> jobs);
 
         // Wait until all submitted jobs have finished.
         void WaitForJobs();
@@ -46,14 +46,18 @@ namespace NN
         // Function executed by each worker thread.
         void WorkerLoop(size_t workerIndex);
 
-        std::vector<std::thread> threads_;
-        std::queue<Job> jobQueue_;
+        vector<Job> activeJobs_;
+        atomic<size_t> nextJobIndex_{0};
+        atomic<size_t> pendingJobs_{0};
 
-        std::mutex queueMutex_;
-        std::condition_variable queueCondition_;
-        std::condition_variable completionCondition_;
+        vector<thread> threads_;
+        queue<Job> jobQueue_;
 
-        size_t pendingJobs_ = 0;
+        mutex queueMutex_;
+        condition_variable queueCondition_;
+        condition_variable completionCondition_;
+
+        //size_t pendingJobs_ = 0;
         bool stopping_ = false;
 
         exception_ptr jobException_ = nullptr;

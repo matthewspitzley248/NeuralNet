@@ -29,14 +29,17 @@ namespace NN
 
 	float Loss::CategoricalCrossEntropy(const Tensor& prediction, int targetLabel) const
 	{
-		if (targetLabel < 0 || targetLabel >= static_cast<int>(prediction.GetSize()))
+		const size_t predSize = prediction.GetSize();
+		if (targetLabel < 0 || targetLabel >= static_cast<int>(predSize))
 		{
 			throw std::out_of_range("Invalid target label");
 		}
 
 		constexpr float epsilon = 1e-10f;
 
-		float probability = prediction.At(targetLabel);
+		// Extract raw data pointer to bypass internal lookup overhead
+		const float* predData = prediction.GetData().data();
+		float probability = predData[targetLabel];
 
 		// Prevent log(0).
 		probability = std::clamp(probability, epsilon, 1.0f);
@@ -46,7 +49,8 @@ namespace NN
 
 	Tensor Loss::CategoricalCrossEntropyGradient(const Tensor& prediction, int targetLabel) const
 	{
-		if (targetLabel < 0 || targetLabel >= static_cast<int>(prediction.GetSize()))
+		const size_t predSize = prediction.GetSize();
+		if (targetLabel < 0 || targetLabel >= static_cast<int>(predSize))
 		{
 			throw std::out_of_range("Invalid target label");
 		}
@@ -55,14 +59,17 @@ namespace NN
 
 		Tensor gradient(prediction.GetShape());
 
-		float probability = std::clamp(prediction.At(targetLabel), epsilon, 1.0f);
+		const float* predData = prediction.GetData().data();
+		float* gradData = gradient.GetData().data();
 
-		for (int i = 0; i < static_cast<int>(prediction.GetSize()); ++i)
-		{
-			gradient.At(i) = 0.0f;
-		}
+		float probability = std::clamp(predData[targetLabel], epsilon, 1.0f);
 
-		gradient.At(targetLabel) = -1.0f / probability;
+		// Optimization: Use standard library bulk memory zeroing 
+		// instead of an explicit for-loop element reset.
+		std::fill_n(gradData, predSize, 0.0f);
+
+		// Directly write to the target label index using raw array access
+		gradData[targetLabel] = -1.0f / probability;
 
 		return gradient;
 	}

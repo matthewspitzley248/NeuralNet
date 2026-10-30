@@ -22,8 +22,8 @@ namespace NN::Layers
 
         virtual void Initialize(mt19937& generator, const vector<size_t>& inputShape) = 0;
         virtual vector<size_t> GetOutputShape(const vector<size_t>& inputShape) = 0;
-        virtual Tensor Run(const Tensor& input, LayerContext& context) = 0;
-        virtual Tensor Backpropagate(const Tensor& input, LayerContext& context) = 0;
+        virtual void Run(const Tensor& source, Tensor& dest, LayerContext& context) = 0;
+        virtual void Backpropagate(const Tensor& input, Tensor& output, LayerContext& context) = 0;
         virtual void ApplyGradients(Optimizer& optimizer, int batchSize) = 0;
         virtual void ResetGradients(LayerContext& context) = 0;
         virtual void AccumulateGradients(LayerContext& context) = 0;

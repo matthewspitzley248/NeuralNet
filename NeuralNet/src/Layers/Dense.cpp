@@ -18,7 +18,7 @@ namespace NN::Layers
         return context;
     }
 
-    void Dense::Initialize(std::mt19937& generator, const std::vector<size_t>& inputShape)
+    void Dense::Initialize(mt19937& generator, const vector<size_t>& inputShape)
     {
         //Get the total number of input features.
         size_t inputSize = 1;
@@ -32,17 +32,26 @@ namespace NN::Layers
         weights_ = Tensor({ units_, inputSize });
         biases_ = Tensor({ units_ });
 
-        //Initialize weights with random values.
-        std::uniform_real_distribution<float> distribution(-0.1f, 0.1f);
+        //Get raw pointers for fast sequential access
+        float* wData = weights_.GetData().data();
+        float* bData = biases_.GetData().data();
+
+        //Initialize weights and biases with random values.
+        uniform_real_distribution<float> distribution(-0.1f, 0.1f);
+
         for (size_t neuron = 0; neuron < units_; neuron++)
         {
-            biases_.At({neuron}) = 0.0f;
+            bData[neuron] = 0.0f;
 
+            const size_t weightOffset = neuron * inputSize;
             for (size_t size = 0; size < inputSize; size++)
             {
-                weights_.At({neuron, size}) = distribution(generator);
+                wData[weightOffset + size] = distribution(generator);
             }
         }
+
+        weightGradients_ = Tensor(weights_.GetShape());
+        biasGradients_ = Tensor(biases_.GetShape());
     }
 
     std::vector<size_t> Dense::GetOutputShape(const std::vector<size_t>& inputShape)
@@ -50,73 +59,81 @@ namespace NN::Layers
         return {units_};
     }
 
-    Tensor Dense::Run(const Tensor& input, LayerContext& context)
+    void Dense::Run(const Tensor& input, Tensor& output, LayerContext& context)
     {
         auto& denseContext = dynamic_cast<DenseContext&>(context);
-
-        denseContext.input = input;
-        Tensor output = Tensor({units_});
 
         const size_t inputSize = input.GetSize();
+        denseContext.input.ReshapeAndResize(input.GetShape());
+        std::copy_n(input.GetData().data(), inputSize, denseContext.input.GetData().data());
 
-        //For each Neuron
+        // Prepare the pre-allocated scratch buffer destination view
+        output.ReshapeAndResize({ static_cast<size_t>(units_) });
+
+        const float* xData = input.GetData().data();
+        const float* wData = weights_.GetData().data();
+        const float* bData = biases_.GetData().data();
+        float* outData = output.GetData().data();
+
+        // Pure sequential execution loop: easily auto-vectorized by the compiler
         for (size_t neuron = 0; neuron < units_; neuron++)
         {
+            float sum = 0.0f;
             const size_t weightOffset = neuron * inputSize;
 
-            //Sum bias + in0*w0 + in1*w1 +...
-            float sum = biases_.AtFlat(neuron);
-
-            //Go through all the inputs and multiply the weights for that neuron with it
-            for (size_t i = 0; i < input.GetSize(); i++)
+            for (size_t size = 0; size < inputSize; size++)
             {
-                sum += input.AtFlat(i) * weights_.AtFlat(weightOffset + i);
+                sum += xData[size] * wData[weightOffset + size];
             }
-            //Add the sum to the output for the neuron
-            output.AtFlat(neuron) = sum;
+
+            outData[neuron] = sum + bData[neuron];
         }
 
-        denseContext.preActivation = output;
+        // Capture the pre-activation state snapshot for the backward pass safely
+        denseContext.preActivation.ReshapeAndResize(output.GetShape());
+        std::copy_n(outData, units_, denseContext.preActivation.GetData().data());
 
-        //Apply Activation to the output
-        return activation_.Apply(activationType_, output);
+        // Apply the activation directly onto the destination scratch buffer
+        activation_.ApplyInPlace(activationType_, output);
     }
 
-
-    Tensor Dense::Backpropagate(const Tensor& gradient, LayerContext& context)
+    void Dense::Backpropagate(const Tensor& input, Tensor& output, LayerContext& context)
     {
         auto& denseContext = dynamic_cast<DenseContext&>(context);
 
-        //Calculate the gradient before the activation.
-        Tensor activationGradient = activation_.ApplyDerivative(activationType_, denseContext.preActivation, gradient);
+        // Calculate activation derivatives natively into a cached tracking variable
+        // inside context, or let ApplyDerivative write into a pre-allocated field.
+        activation_.ApplyDerivativeInPlace(activationType_, denseContext.preActivation, input, denseContext.activationGradient);
 
         const size_t inputSize = denseContext.input.GetSize();
 
-        //Calculate the gradient for the previous layer.
-        Tensor inputGradient(denseContext.input.GetShape());
+        output.ReshapeAndResize(denseContext.input.GetShape());
 
-        //Accumulate gradients for weights and biases.
+        const float* actGradData = denseContext.activationGradient.GetData().data();
+        const float* inputData = denseContext.input.GetData().data();
+        const float* wData = weights_.GetData().data();
+
+        float* biasGradData = denseContext.biasGradients.GetData().data();
+        float* weightGradData = denseContext.weightGradients.GetData().data();
+        float* inGradData = output.GetData().data();
+
+        std::fill_n(inGradData, inputSize, 0.0f);
+
+        // Completely lock-free execution path. 
+        // The compiler can unroll and pipelining this smoothly now.
         for (size_t neuron = 0; neuron < units_; neuron++)
         {
-
-            const float neuronGradient = activationGradient.AtFlat(neuron);
+            const float neuronGradient = actGradData[neuron];
             const size_t weightOffset = neuron * inputSize;
 
-            //Accumulate bias gradient.
-            denseContext.biasGradients.AtFlat(neuron) += neuronGradient;
+            biasGradData[neuron] += neuronGradient;
 
-            //Accumulate weight gradients.
             for (size_t i = 0; i < inputSize; i++)
             {
-                //Accumulate weight gradient
-                denseContext.weightGradients.AtFlat(weightOffset + i) += neuronGradient * denseContext.input.AtFlat(i);
-
-                //Calculate gradient for the previous layer
-                inputGradient.AtFlat(i) += weights_.AtFlat(weightOffset + i) * neuronGradient;
+                weightGradData[weightOffset + i] += neuronGradient * inputData[i];
+                inGradData[i] += wData[weightOffset + i] * neuronGradient;
             }
         }
-
-        return inputGradient;
     }
 
     void Dense::ApplyGradients(Optimizer& optimizer, int batchSize)
@@ -132,25 +149,37 @@ namespace NN::Layers
     {
         auto& denseContext = dynamic_cast<DenseContext&>(context);
 
-        denseContext.weightGradients = Tensor(weights_.GetShape());
-        denseContext.biasGradients = Tensor(biases_.GetShape());
+        // Reuse existing allocated memory blocks and clear elements to 0.0f in-place
+        std::fill(denseContext.weightGradients.GetData().begin(), denseContext.weightGradients.GetData().end(), 0.0f);
+        std::fill(denseContext.biasGradients.GetData().begin(), denseContext.biasGradients.GetData().end(), 0.0f);
 
-        weightGradients_ = Tensor(weights_.GetShape());
-        biasGradients_ = Tensor(biases_.GetShape());
+        std::fill(weightGradients_.GetData().begin(), weightGradients_.GetData().end(), 0.0f);
+        std::fill(biasGradients_.GetData().begin(), biasGradients_.GetData().end(), 0.0f);
     }
 
     void Dense::AccumulateGradients(LayerContext& context)
     {
         auto& denseContext = dynamic_cast<DenseContext&>(context);
 
-        for (size_t i = 0; i < weightGradients_.GetSize(); ++i)
+        // Extract raw pointers for contiguous data processing
+        float* wGradData = weightGradients_.GetData().data();
+        const float* ctxWGradData = denseContext.weightGradients.GetData().data();
+
+        float* bGradData = biasGradients_.GetData().data();
+        const float* ctxBGradData = denseContext.biasGradients.GetData().data();
+
+        const size_t wSize = weightGradients_.GetSize();
+        const size_t bSize = biasGradients_.GetSize();
+
+        // Fast, localized flat memory accumulation loops
+        for (size_t i = 0; i < wSize; i++)
         {
-            weightGradients_.AtFlat(i) +=  denseContext.weightGradients.AtFlat(i);
+            wGradData[i] += ctxWGradData[i];
         }
 
-        for (size_t i = 0; i < biasGradients_.GetSize(); ++i)
+        for (size_t i = 0; i < bSize; i++)
         {
-            biasGradients_.AtFlat(i) += denseContext.biasGradients.AtFlat(i);
+            bGradData[i] += ctxBGradData[i];
         }
     }
 }

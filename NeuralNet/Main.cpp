@@ -137,7 +137,7 @@ int main()
 
     //cout << filesystem::current_path() << '\n';
 
-    Tensor image = imgLoader.Load(string("Dataset/Zero_full (1).jpg"));
+    Tensor image = imgLoader.Load(string("Dataset/testImage.png"));
 
     vector<size_t> inputShape = image.GetShape();
 
@@ -196,13 +196,23 @@ int main()
     //model.Sequential();
     Sequential model = Sequential(inputShape, randomGenerator);
 
+    model.Add<Conv2D>(5, pair{3, 3}, pair{1, 1}, ActivationType::Relu, Padding::Same);
+    //model.Add<Conv2D>(25, pair{ 5, 5 }, pair{ 1, 1 }, ActivationType::Relu, Padding::Same);
+    //model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 },  Padding::Same);
+
+    //model.Add<Conv2D>(50, pair{ 5, 5 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
+    //model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Same);
+
+    //model.Add<Conv2D>(70, pair{ 3, 3 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
+    //model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Valid);
+
     model.Add<Flatten>();
-    model.Add<Dense>(200, ActivationType::Relu);
+    model.Add<Dense>(100, ActivationType::Relu);
     model.Add<Dense>(100, ActivationType::Relu);
     //output layer
-    model.Add<Dense>(10, ActivationType::Softmax);
+    model.Add<Dense>(trainImageGen.GetLabelSize(), ActivationType::Softmax);
 
-    model.Compile(LossType::CategoricalCrossEntropy, OptimizerType::SGD, { Metric::Accuracy }, 16);
+    model.Compile(LossType::CategoricalCrossEntropy, OptimizerType::Adam, { Metric::Accuracy }, 16);
 
     //Need to get some sort of early stop and reduce learning rate for the model
 

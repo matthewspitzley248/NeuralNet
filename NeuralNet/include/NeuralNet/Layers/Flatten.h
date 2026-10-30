@@ -20,9 +20,9 @@ namespace NN::Layers
 
         std::vector<size_t> GetOutputShape(const std::vector<size_t>& inputShape) override;
 
-        Tensor Run(const Tensor& input, LayerContext& context) override;
+        void Run(const Tensor& input, Tensor& output, LayerContext& context) override;
 
-        Tensor Backpropagate(const Tensor& gradient, LayerContext& context) override;
+        void Backpropagate(const Tensor& input, Tensor& output, LayerContext& context) override;
 
         void ApplyGradients(Optimizer& optimizer, int batchSize) override;
 

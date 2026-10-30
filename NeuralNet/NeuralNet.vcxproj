@@ -135,11 +135,13 @@
     <ClInclude Include="include\NeuralNet\Layers\Layer.h" />
     <ClInclude Include="include\NeuralNet\Layers\MaxPool2D.h" />
     <ClInclude Include="include\NeuralNet\Loss.h" />
+    <ClInclude Include="include\NeuralNet\Math.h" />
     <ClInclude Include="include\NeuralNet\Models.h" />
     <ClInclude Include="include\NeuralNet\Models\Model.h" />
     <ClInclude Include="include\NeuralNet\Models\Sequential.h" />
     <ClInclude Include="include\NeuralNet\NeuralNet.h" />
     <ClInclude Include="include\NeuralNet\Optimizer.h" />
+    <ClInclude Include="include\NeuralNet\Padding.h" />
     <ClInclude Include="include\NeuralNet\Tensor.h" />
     <ClInclude Include="include\NeuralNet\WorkerPool.h" />
     <ClInclude Include="include\stb_image.h" />
@@ -147,12 +149,14 @@
   <ItemGroup>
     <ClCompile Include="include\NeuralNet\Layers\Layer.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Math.cpp" />
     <ClCompile Include="src\Activation.cpp" />
     <ClCompile Include="src\ImageDataGenerator.cpp" />
     <ClCompile Include="src\ImageLoader.cpp" />
     <ClCompile Include="src\Layers\Conv2D.cpp" />
     <ClCompile Include="src\Layers\Dense.cpp" />
     <ClCompile Include="src\Layers\Flatten.cpp" />
+    <ClCompile Include="src\Layers\MaxPool2D.cpp" />
     <ClCompile Include="src\Loss.cpp" />
     <ClCompile Include="src\Models\Model.cpp" />
     <ClCompile Include="src\Models\Sequential.cpp" />

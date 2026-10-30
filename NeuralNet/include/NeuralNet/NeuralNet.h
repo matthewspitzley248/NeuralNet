@@ -11,6 +11,8 @@
 #include <NeuralNet/Loss.h>
 #include <NeuralNet/Activation.h>
 #include <NeuralNet/WorkerPool.h>
+#include <NeuralNet/Math.h>
+#include <NeuralNet/Padding.h>
 
 
 namespace NN

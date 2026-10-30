@@ -10,24 +10,26 @@ namespace NN
 
     void WorkerPool::Start(size_t workerCount)
     {
-        std::unique_lock<std::mutex> lock(queueMutex_);
+        unique_lock<mutex> lock(queueMutex_);
 
         if (!threads_.empty())
         {
-            throw std::logic_error("WorkerPool has already been started.");
+            throw logic_error("WorkerPool has already been started.");
         }
 
         if (workerCount == 0)
         {
-            throw std::invalid_argument("WorkerPool requires at least one worker.");
+            throw invalid_argument("WorkerPool requires at least one worker.");
         }
 
         stopping_ = false;
         jobException_ = nullptr;
+        nextJobIndex_ = 0;
+        pendingJobs_ = 0;
 
         try
         {
-            for (size_t i = 0; i < workerCount; ++i)
+            for (size_t i = 0; i < workerCount; i++)
             {
                 threads_.emplace_back(&WorkerPool::WorkerLoop, this, i);
             }
@@ -39,7 +41,7 @@ namespace NN
 
             queueCondition_.notify_all();
 
-            for (std::thread& thread : threads_)
+            for (thread& thread : threads_)
             {
                 if (thread.joinable())
                 {
@@ -59,12 +61,12 @@ namespace NN
     void WorkerPool::Stop()
     {
         {
-            std::unique_lock<std::mutex> lock(queueMutex_);
+            unique_lock<mutex> lock(queueMutex_);
 
             // Allow submitted jobs to finish before shutting down.
             completionCondition_.wait(lock, [this]()
                 {
-                    return pendingJobs_ == 0;
+                    return pendingJobs_.load() == 0;
                 });
 
             stopping_ = true;
@@ -72,7 +74,7 @@ namespace NN
 
         queueCondition_.notify_all();
 
-        for (std::thread& thread : threads_)
+        for (thread& thread : threads_)
         {
             if (thread.joinable())
             {
@@ -81,12 +83,10 @@ namespace NN
         }
 
         threads_.clear();
-
-        std::lock_guard<std::mutex> lock(queueMutex_);
-        stopping_ = false;
+        activeJobs_.clear();
     }
 
-    void WorkerPool::SubmitJobs(std::vector<Job> jobs)
+    void WorkerPool::SubmitJobs(vector<Job> jobs)
     {
         if (jobs.empty())
         {
@@ -94,26 +94,24 @@ namespace NN
         }
 
         {
-            std::lock_guard<std::mutex> lock(queueMutex_);
+            lock_guard<mutex> lock(queueMutex_);
 
             if (stopping_)
             {
-                throw std::logic_error(
-                    "Cannot submit jobs while WorkerPool is stopping.");
+                throw logic_error("Cannot submit jobs while WorkerPool is stopping.");
             }
 
             if (threads_.empty())
             {
-                throw std::logic_error(
-                    "WorkerPool must be started before submitting jobs.");
+                throw logic_error("WorkerPool must be started before submitting jobs.");
             }
 
-            pendingJobs_ += jobs.size();
-
-            for (Job& job : jobs)
-            {
-                jobQueue_.push(std::move(job));
-            }
+            // Zero Allocation Hand-Off Optimization:
+            // Store the jobs into a contiguous vector and reset the atomic counter.
+            // This replaces pushing elements one-by-one into a slow queue.
+            activeJobs_ = std::move(jobs);
+            nextJobIndex_ = 0;
+            pendingJobs_ = activeJobs_.size();
         }
 
         queueCondition_.notify_all();
@@ -121,23 +119,23 @@ namespace NN
 
     void WorkerPool::WaitForJobs()
     {
-        std::exception_ptr exception;
+        exception_ptr exception;
 
         {
-            std::unique_lock<std::mutex> lock(queueMutex_);
+            unique_lock<mutex> lock(queueMutex_);
 
             completionCondition_.wait(lock, [this]()
                 {
-                    return pendingJobs_ == 0;
+                    return pendingJobs_.load() == 0;
                 });
 
-            exception = std::exchange(jobException_, nullptr);
+            exception = exchange(jobException_, nullptr);
         }
 
         // Re-throw on the calling thread, not on a worker thread.
         if (exception)
         {
-            std::rethrow_exception(exception);
+            rethrow_exception(exception);
         }
     }
 
@@ -150,69 +148,76 @@ namespace NN
     {
         while (true)
         {
-            Job job;
+            size_t myJobIdx = 0;
+            bool foundJob = false;
 
+            // 1. Lock-Free Stealing Optimization Phase
+            // Threads grab work by incrementing the atomic pointer index.
+            // This completely bypasses the queueMutex_ lock!
+            size_t currentIdx = nextJobIndex_.load(std::memory_order_relaxed);
+            while (currentIdx < activeJobs_.size())
+            {
+                if (nextJobIndex_.compare_exchange_weak(currentIdx, currentIdx + 1,
+                    std::memory_order_seq_cst,
+                    std::memory_order_relaxed))
+                {
+                    myJobIdx = currentIdx;
+                    foundJob = true;
+                    break;
+                }
+            }
+
+            // 2. Mutex Fallback Phase (Only triggered when the active batch is empty)
+            if (!foundJob)
             {
                 std::unique_lock<std::mutex> lock(queueMutex_);
 
                 queueCondition_.wait(lock, [this]()
                     {
-                        return stopping_ || !jobQueue_.empty();
+                        return stopping_ || (nextJobIndex_.load() < activeJobs_.size());
                     });
 
-                // Exit only after shutdown is requested and the queue
-                // has been drained.
-                if (stopping_ && jobQueue_.empty())
+                if (stopping_ && (nextJobIndex_.load() >= activeJobs_.size()))
                 {
                     return;
                 }
 
-                job = std::move(jobQueue_.front());
-                jobQueue_.pop();
+                // Try to steal again immediately after waking up
+                continue;
             }
 
+            // 3. Thread Safe Execution Phase
             try
             {
-                // Run the job without holding the queue mutex.
-                job(workerIndex);
+                // Run the job completely independent of lock parameters
+                activeJobs_[myJobIdx](workerIndex);
             }
             catch (const std::exception& e)
             {
-                printf("[Worker %zu] Exception in job: %s\n",
-                    workerIndex, e.what());
-
+                printf("[Worker %zu] Exception in job: %s\n", workerIndex, e.what());
+                std::lock_guard<std::mutex> lock(queueMutex_);
+                if (!jobException_)
                 {
-                    std::lock_guard<std::mutex> lock(queueMutex_);
-
-                    if (!jobException_)
-                    {
-                        jobException_ = std::current_exception();
-                    }
+                    jobException_ = std::current_exception();
                 }
             }
             catch (...)
             {
                 printf("[Worker %zu] Unknown exception in job.\n", workerIndex);
-
+                std::lock_guard<std::mutex> lock(queueMutex_);
+                if (!jobException_)
                 {
-                    std::lock_guard<std::mutex> lock(queueMutex_);
-
-                    if (!jobException_)
-                    {
-                        jobException_ = std::current_exception();
-                    }
+                    jobException_ = std::current_exception();
                 }
             }
 
+            // 4. Lock-Free Atomic Progress Reduction
+            // If this thread finishes the very last job in the active pool, 
+            // it notifies the condition variable cleanly.
+            if (pendingJobs_.fetch_sub(1, std::memory_order_acq_rel) == 1)
             {
                 std::lock_guard<std::mutex> lock(queueMutex_);
-
-                --pendingJobs_;
-
-                if (pendingJobs_ == 0)
-                {
-                    completionCondition_.notify_all();
-                }
+                completionCondition_.notify_all();
             }
         }
     }

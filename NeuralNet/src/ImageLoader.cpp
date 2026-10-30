@@ -6,45 +6,41 @@
 
 namespace NN 
 {
-	/// <summary>
-	/// Takes in a path to an image and loads it into a Tensor
-	/// </summary>
-	/// <param name="path">string - location of the image to load into a tensor</param>
-	/// <returns>Tensor - the image stored as a Tensor</returns>
-	Tensor ImageLoader::Load(const std::string& path)
-	{
-		int width, height, channels;
-		unsigned char* img = stbi_load(path.c_str(), &width, &height, &channels, 0);
-		if (img == NULL) {
-			throw std::runtime_error("Error loading image: " + path);
-		}
+    Tensor ImageLoader::Load(const std::string& path)
+    {
+        int width, height, channels;
 
-		//printf("Loaded image with a width of %dpx, a height of %dpx and %d channels\n", width, height, channels);
+        // Load image using stb_image
+        unsigned char* img = stbi_load(path.c_str(), &width, &height, &channels, 0);
 
-		const size_t imageWidth = static_cast<size_t>(width);
-		const size_t imageHeight = static_cast<size_t>(height);
-		const size_t imageChannels = static_cast<size_t>(channels);
+        if (img == nullptr)
+            throw std::runtime_error("Error loading image: " + path);
 
-		Tensor imgTensor = Tensor({ imageHeight, imageWidth, imageChannels });
+        const size_t imageWidth = static_cast<size_t>(width);
+        const size_t imageHeight = static_cast<size_t>(height);
+        const size_t imageChannels = static_cast<size_t>(channels);
 
-        //loop through the img list and put it into the tensor
-        for (size_t y = 0; y < height; y++)
+        Tensor imgTensor({ imageHeight, imageWidth, imageChannels });
+
+        const size_t pixelCount = imageHeight * imageWidth * imageChannels;
+
+        // Extract the raw data destination pointer
+        float* destData = imgTensor.GetData().data();
+
+        // Performance Optimization: Hoist the division out of the loop.
+        // Multiplying by a reciprocal is significantly faster than standard division.
+        const float invScale = 1.0f / 255.0f;
+
+        // The compiler can now fully auto-vectorize this loop using SIMD instructions.
+        for (size_t i = 0; i < pixelCount; ++i)
         {
-            for (size_t x = 0; x < width; x++)
-            {
-                for (size_t c = 0; c < channels; c++)
-                {
-                    int imgIndex = (y * width * channels) + (x * channels) + c;
-
-                    //normalize image to 0-1
-					imgTensor.At({ y, x, c }) = static_cast<float>(img[imgIndex]) / 255.0f;
-                }
-            }
+            destData[i] = static_cast<float>(img[i]) * invScale;
         }
+
         stbi_image_free(img);
 
-		return imgTensor;
-	}
+        return imgTensor;
+    }
 
 
 	Tensor ImageLoader::Load(const std::filesystem::path& path)

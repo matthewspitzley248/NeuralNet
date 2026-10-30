@@ -7,71 +7,78 @@ namespace NN
 	/// </summary>
 	/// <param name="shape">vector<int> - shape of the new tensor object</param>
 	Tensor::Tensor(std::vector<size_t> shape)
+		: shape_(shape)
 	{
-		shape_ = shape;
-
-		int dataPoints = 1;
-		while (!shape.empty())
-		{
-			dataPoints *= shape.back();
-			shape.pop_back();
-		}
-
-		data_.resize(dataPoints);
+		size_t totalElements = std::accumulate(
+			shape_.begin(),
+			shape_.end(),
+			size_t{ 1 },
+			std::multiplies<size_t>()
+		);
+		
+		data_.resize(totalElements);
 	}
 
-	/// <summary>
-	/// gets teh value at the given location index.
-	/// </summary>
-	/// <param name="index">vector<int> - location to get value</param>
-	/// <returns>float - reference to value at given index</returns>
-	float& Tensor::At(const std::vector<size_t>& index)
+	Tensor& Tensor::operator=(Tensor&& other) noexcept
 	{
-		//check for bounds of shape
-		if (index.size() != shape_.size())
+		// 1. Self-assignment check (safeguards against: a = std::move(a);)
+		if (this != &other)
 		{
-			printf("[Tensor] Out of bounds! Size: %zu, Shape: \n", data_.size());
-			throw std::out_of_range("Tensor index out of bounds.");
+			// 2. Perform the move inside the function body
+			shape_ = std::move(other.shape_);
+			data_ = std::move(other.data_);
 		}
 
-		int returnIndex = 0;
-		int stride = 1;
-		for (int i = 0; i < index.size(); i++)
-		{
-			//say want (300, 300, 3) would be At(299, 299, 2), shape would be (300, 300, 3)
-			if (index.at(i) < 0 || index.at(i) >= shape_.at(i))
-			{
-				printf("[Tensor] Out of bounds! Size: %zu, Shape: \n", data_.size());
-				throw std::out_of_range("Tensor index out of bounds.");
-			}
-
-			returnIndex += index.at(i) * stride;
-			stride *= shape_.at(i);
-		}
-
-		return data_.at(returnIndex);
+		return *this;
 	}
 
-	/*float& Tensor::At(const int y, const int x, const int z)
-	{
-		return data_.at(y + (x * 3) + (z * 9));
-	}*/
+	//float& Tensor::At(const std::vector<size_t>& index)
+	//{
+	//	//check for bounds of shape
+	//	if (index.size() != shape_.size())
+	//	{
+	//		printf("[Tensor] Out of bounds! Size: %zu, Shape: \n", data_.size());
+	//		throw std::out_of_range("Tensor index out of bounds.");
+	//	}
 
-	float& Tensor::At(size_t index)
-	{
-		if (shape_.size() != 1)
-		{
-			throw std::runtime_error("Tensor is not 1D");
-		}
+	//	int returnIndex = 0;
+	//	int stride = 1;
+	//	for (int i = 0; i < index.size(); i++)
+	//	{
+	//		//say want (300, 300, 3) would be At(299, 299, 2), shape would be (300, 300, 3)
+	//		if (index.at(i) < 0 || index.at(i) >= shape_.at(i))
+	//		{
+	//			printf("[Tensor] Out of bounds! Size: %zu, Shape: \n", data_.size());
+	//			throw std::out_of_range("Tensor index out of bounds.");
+	//		}
 
-		if (index < 0 || index >= shape_[0])
-		{
-			printf("[Tensor] Out of bounds! Index: %zu, Size: %zu, Shape: \n", index, data_.size());
-			throw std::out_of_range("Tensor index out of bounds");
-		}
+	//		returnIndex += index.at(i) * stride;
+	//		stride *= shape_.at(i);
+	//	}
 
-		return data_[index];
-	}
+	//	return data_.at(returnIndex);
+	//}
+
+	///*float& Tensor::At(const int y, const int x, const int z)
+	//{
+	//	return data_.at(y + (x * 3) + (z * 9));
+	//}*/
+
+	//float& Tensor::At(size_t index)
+	//{
+	//	if (shape_.size() != 1)
+	//	{
+	//		throw std::runtime_error("Tensor is not 1D");
+	//	}
+
+	//	if (index < 0 || index >= shape_[0])
+	//	{
+	//		printf("[Tensor] Out of bounds! Index: %zu, Size: %zu, Shape: \n", index, data_.size());
+	//		throw std::out_of_range("Tensor index out of bounds");
+	//	}
+
+	//	return data_[index];
+	//}
 
 	float& Tensor::AtFlat(size_t index)
 	{
@@ -85,20 +92,20 @@ namespace NN
 		return data_.at(index);
 	}
 
-	const float& Tensor::At(const std::vector<size_t>& index) const
-	{
-		return const_cast<Tensor*>(this)->At(index);
-	}
+	//const float& Tensor::At(const std::vector<size_t>& index) const
+	//{
+	//	return const_cast<Tensor*>(this)->At(index);
+	//}
 
-	/*const float& Tensor::At(const int y, const int x, const int z) const
-	{
-		return const_cast<Tensor*>(this)->At(y, x, z);
-	}*/
+	///*const float& Tensor::At(const int y, const int x, const int z) const
+	//{
+	//	return const_cast<Tensor*>(this)->At(y, x, z);
+	//}*/
 
-	const float& Tensor::At(size_t index) const
-	{
-		return const_cast<Tensor*>(this)->At(index);
-	}
+	//const float& Tensor::At(size_t index) const
+	//{
+	//	return const_cast<Tensor*>(this)->At(index);
+	//}
 
 	const float& Tensor::AtFlat(size_t index) const
 	{
@@ -113,6 +120,16 @@ namespace NN
 	const size_t& Tensor::GetSize() const
 	{
 		return data_.size();
+	}
+
+	std::vector<float>& Tensor::GetData()
+	{
+		return data_;
+	}
+
+	const std::vector<float>& Tensor::GetData() const
+	{
+		return data_;
 	}
 
 
@@ -140,6 +157,24 @@ namespace NN
 			);
 		}
 
+		shape_ = newShape;
+	}
+
+	void Tensor::ReshapeAndResize(const std::vector<size_t>& newShape)
+	{
+		size_t newSize = 1;
+		for (size_t dimension : newShape)
+		{
+			if (dimension <= 0)
+			{
+				throw std::invalid_argument("Tensor dimensions must be positive.");
+			}
+			newSize *= static_cast<size_t>(dimension);
+		}
+
+		// This is the performance win: std::vector::resize() will NOT allocate 
+		// fresh heap memory if newSize is less than or equal to the vector's current capacity().
+		data_.resize(newSize);
 		shape_ = newShape;
 	}
 }

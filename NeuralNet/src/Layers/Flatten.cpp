@@ -29,25 +29,25 @@ namespace NN::Layers
         return { totalSize };
     }
 
-    Tensor Flatten::Run(const Tensor& input, LayerContext& context)
+    void Flatten::Run(const Tensor& input, Tensor& output, LayerContext& context)
     {
-        auto& flattenContext = dynamic_cast<FlattenContext&>(context);
+        const size_t totalElements = input.GetSize();
 
-        Tensor output = input;
-        output.SetShape({ static_cast<size_t>(input.GetSize()) });
+        // 1. Force the destination buffer size to match without hitting the OS heap
+        output.ReshapeAndResize({ totalElements });
 
-        return output;
+        // 2. Direct fast block memory copy (or pointer swap if optimized further)
+        std::copy_n(input.GetData().data(), totalElements, output.GetData().data());
     }
 
-    Tensor Flatten::Backpropagate(const Tensor& gradient, LayerContext& context)
+    void Flatten::Backpropagate(const Tensor& input, Tensor& output, LayerContext& context)
     {
-        auto& flattenContext = dynamic_cast<FlattenContext&>(context);
+        output.ReshapeAndResize(inputShape_);
 
-        //Restores the gradient to the original input shape.
-        Tensor inputGradient = gradient;
-        inputGradient.SetShape(inputShape_);
-
-        return inputGradient;
+        // 3. Fast contiguous raw block copy from the source gradient to the destination buffer.
+        // Since flattening doesn't change any mathematical numbers, this is a clean L1/L2 cache stream.
+        const size_t totalElements = input.GetSize();
+        std::copy_n(input.GetData().data(), totalElements, output.GetData().data());
     }
 
     void Flatten::ApplyGradients(Optimizer& optimizer, int batchSize)
