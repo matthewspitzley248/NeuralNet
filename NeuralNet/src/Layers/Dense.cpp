@@ -90,11 +90,14 @@ namespace NN::Layers
         }
 
         // Capture the pre-activation state snapshot for the backward pass safely
-        denseContext.preActivation.ReshapeAndResize(output.GetShape());
-        std::copy_n(outData, units_, denseContext.preActivation.GetData().data());
+        //denseContext.preActivation.ReshapeAndResize(output.GetShape());
+        //std::copy_n(outData, units_, denseContext.preActivation.GetData().data());
 
         // Apply the activation directly onto the destination scratch buffer
-        activation_.ApplyInPlace(activationType_, output);
+        activation_.Apply(activationType_, output);
+
+        denseContext.output.ReshapeAndResize(output.GetShape());
+        std::copy_n(outData, units_, denseContext.output.GetData().data());
     }
 
     void Dense::Backpropagate(const Tensor& input, Tensor& output, LayerContext& context)
@@ -103,7 +106,7 @@ namespace NN::Layers
 
         // Calculate activation derivatives natively into a cached tracking variable
         // inside context, or let ApplyDerivative write into a pre-allocated field.
-        activation_.ApplyDerivativeInPlace(activationType_, denseContext.preActivation, input, denseContext.activationGradient);
+        activation_.ApplyDerivative(activationType_, denseContext.output, input, denseContext.activationGradient);
 
         const size_t inputSize = denseContext.input.GetSize();
 

@@ -10,12 +10,12 @@ namespace NN::Layers
     struct Conv2DContext : LayerContext
     {
         Tensor input;
-        Tensor preActivation;
-        Tensor activationGradient;
+        Tensor output;
 
         //Accumulated gradients
         Tensor weightGradients;
         Tensor biasGradients;
+        Tensor activationGradient;
 
         // Caches the massive spatial column footprints safely
         Tensor columnsCache;

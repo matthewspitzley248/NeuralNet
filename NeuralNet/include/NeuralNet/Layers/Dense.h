@@ -8,12 +8,12 @@ namespace NN::Layers
     {
         //Forward pass info
         Tensor input;
-        Tensor preActivation;
-        Tensor activationGradient;
+        Tensor output;
 
         //Accumulated gradients
         Tensor weightGradients;
         Tensor biasGradients;
+        Tensor activationGradient;
     };
 
     class Dense : public Layer

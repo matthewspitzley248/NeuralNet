@@ -170,14 +170,14 @@ int main()
 
     // Training settings
     GeneratorSettings trainGenSettings;
-    trainGenSettings.directory = "Dataset/train";
+    trainGenSettings.directory = "Dataset/Data/train";
     trainGenSettings.batchSize = 32;
     trainGenSettings.classMode = ClassMode::Categorical;
     trainGenSettings.shuffle = true;
 
     // Test settings
     GeneratorSettings testGenSettings;
-    testGenSettings.directory = "Dataset/test";
+    testGenSettings.directory = "Dataset/Data/test";
     testGenSettings.batchSize = 64;
     testGenSettings.classMode = ClassMode::Categorical;
     testGenSettings.shuffle = false;
@@ -196,15 +196,15 @@ int main()
     //model.Sequential();
     Sequential model = Sequential(inputShape, randomGenerator);
 
-    model.Add<Conv2D>(5, pair{3, 3}, pair{1, 1}, ActivationType::Relu, Padding::Same);
+    //model.Add<Conv2D>(5, pair{3, 3}, pair{1, 1}, ActivationType::Relu, Padding::Same);
     //model.Add<Conv2D>(25, pair{ 5, 5 }, pair{ 1, 1 }, ActivationType::Relu, Padding::Same);
-    //model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 },  Padding::Same);
+    model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 },  Padding::Same);
 
     //model.Add<Conv2D>(50, pair{ 5, 5 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
-    //model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Same);
+    model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Same);
 
-    //model.Add<Conv2D>(70, pair{ 3, 3 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
-    //model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Valid);
+    model.Add<Conv2D>(70, pair{ 3, 3 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
+    model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Valid);
 
     model.Add<Flatten>();
     model.Add<Dense>(100, ActivationType::Relu);

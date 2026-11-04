@@ -253,11 +253,14 @@ namespace NN::Layers
         output.SetShape({ outputHeight, outputWidth, numFilters });
 
         // 6. Snapshot the pre-activation state safely for the backward pass
-        convContext.preActivation.ReshapeAndResize(output.GetShape());
-        std::copy_n(outData, totalElements, convContext.preActivation.GetData().data());
+        /*convContext.preActivation.ReshapeAndResize(output.GetShape());
+        std::copy_n(outData, totalElements, convContext.preActivation.GetData().data());*/
 
         // 7. Apply the activation function in-place directly on the destination scratch tensor
-        activation_.ApplyInPlace(activationType_, output);
+        activation_.Apply(activationType_, output);
+
+        convContext.output.ReshapeAndResize(output.GetShape());
+        std::copy_n(outData, totalElements, convContext.output.GetData().data());
     }
 
 
@@ -368,10 +371,10 @@ namespace NN::Layers
         auto& convContext = dynamic_cast<Conv2DContext&>(context);
 
         // 1. Calculate the activation derivative.
-        activation_.ApplyDerivativeInPlace(activationType_, convContext.preActivation, input, convContext.activationGradient);
+        activation_.ApplyDerivative(activationType_, convContext.output, input, convContext.activationGradient);
 
         const auto& inputShape = convContext.input.GetShape();
-        const auto outputShape = convContext.preActivation.GetShape();
+        const auto outputShape = convContext.output.GetShape();
 
         const size_t inputHeight = inputShape[0];
         const size_t inputWidth = inputShape[1];
