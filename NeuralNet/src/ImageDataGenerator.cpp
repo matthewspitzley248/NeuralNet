@@ -37,6 +37,10 @@ namespace NN
 			}
 		}
 
+		//Get the imagesize
+		if (!labeledImages_.empty())
+			imageSize_ = imgLoader_.GetImageSize(labeledImages_[0].imagePath.string());
+
 		if (generatorSettings_.shuffle)
 		{
 			shuffle(labeledImages_.begin(),	labeledImages_.end(), randomGenerator_);
@@ -150,6 +154,11 @@ namespace NN
 	int ImageDataGenerator::GetLabelSize()
 	{
 		return labels_.size();
+	}
+
+	vector<size_t> ImageDataGenerator::GetImageSize()
+	{
+		return imageSize_;
 	}
 
 

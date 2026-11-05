@@ -75,8 +75,6 @@ namespace NN::Models
                 batchCount++;
                 const size_t batchSize = batch.imageLabels.size();
 
-                //printf("\n[Batch %d] Starting batch with %zu images\n", batchCount, batchSize);
-
                 //Clear the gradients accumulated during previous batches.
                 ResetWorkerGradients();
 
@@ -94,31 +92,23 @@ namespace NN::Models
                             const ImageLabel& item = batch.imageLabels[i];
                             WorkerContext& worker = workers_[workerIndex];
 
-                            //printf("[Worker %zu][Image %zu] Starting job. Label index: %d\n", workerIndex, i, item.labelIndex);
-
                             //Forward pass using this worker's contexts.
                             Tensor prediction = Run(item.image, worker);
-                            //printf("[Worker %zu][Image %zu] Forward pass complete. Output size: %zu\n", workerIndex, i, prediction.GetSize());
 
                             //Calculate the image's loss.
                             imageLosses[i] = loss_.Calculate(prediction, item.labelIndex, lossType_);
-                            //printf("[Worker %zu][Image %zu] Loss calculated: %.6f\n", workerIndex, i, imageLosses[i]);
 
                             //Calculate loss gradient.
                             Tensor gradient = loss_.CalculateGradient(prediction, item.labelIndex, lossType_);
-                            //printf("[Worker %zu][Image %zu] Loss gradient calculated. Size: %zu\n", workerIndex, i, gradient.GetSize());
 
                             //Backpropagate into this worker's gradient buffers.
                             Backpropagation(move(gradient), worker);
-                            //printf("[Worker %zu][Image %zu] Backpropagation complete. Job finished.\n", workerIndex, i);
                         });
                 }
 
                 //Execute all images using the shared worker pool.
                 workerPool_.SubmitJobs(move(jobs));
                 workerPool_.WaitForJobs();
-
-                //printf("[Batch %d] Wait for Jobs complete.\n", batchCount);
 
                 //Sum the losses after all jobs have finished.
                 // Vectorized Reductions: Faster data consolidation using standard pipelines
@@ -128,8 +118,6 @@ namespace NN::Models
                 //Combine gradients from all workers, then update weights once using the full batch.
                 AccumulateWorkerGradients();
                 ApplyGradients(static_cast<int>(batchSize));
-
-                //printf("[Batch %d] Parameter update complete.\n", batchCount);
 
                 const auto batchEnd = Clock::now();
 

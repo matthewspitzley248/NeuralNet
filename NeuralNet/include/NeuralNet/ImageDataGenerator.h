@@ -80,7 +80,11 @@ namespace NN
 
         int GetLabelSize();
 
+        vector<size_t> GetImageSize();
+
     protected:
+
+        vector<size_t> imageSize_;
 
         ImageSettings imageSettings_;
         GeneratorSettings generatorSettings_;

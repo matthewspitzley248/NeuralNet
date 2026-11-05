@@ -47,4 +47,26 @@ namespace NN
 	{
 		return Load(path.string());
 	}
+
+    std::vector<size_t> ImageLoader::GetImageSize(const std::string& path)
+    {
+        int width, height, channels;
+
+        // Load image using stb_image
+        unsigned char* img = stbi_load(path.c_str(), &width, &height, &channels, 0);
+
+        if (img == nullptr)
+            throw std::runtime_error("Error loading image: " + path);
+
+        const size_t imageWidth = static_cast<size_t>(width);
+        const size_t imageHeight = static_cast<size_t>(height);
+        const size_t imageChannels = static_cast<size_t>(channels);
+
+        return { imageHeight, imageWidth, imageChannels };
+    }
+
+    std::vector<size_t> ImageLoader::GetImageSize(const std::filesystem::path& path)
+    {
+        return GetImageSize(path.string());
+    }
 }

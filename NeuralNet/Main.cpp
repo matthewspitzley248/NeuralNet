@@ -194,7 +194,7 @@ int main()
 
 
     //model.Sequential();
-    Sequential model = Sequential(inputShape, randomGenerator);
+    Sequential model = Sequential(testImageGen.GetImageSize(), randomGenerator);
 
     //model.Add<Conv2D>(5, pair{3, 3}, pair{1, 1}, ActivationType::Relu, Padding::Same);
     //model.Add<Conv2D>(25, pair{ 5, 5 }, pair{ 1, 1 }, ActivationType::Relu, Padding::Same);
