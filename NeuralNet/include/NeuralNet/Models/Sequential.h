@@ -11,14 +11,6 @@ using Clock = std::chrono::steady_clock;
 
 namespace NN::Models
 {
-    struct WorkerContext
-    {
-        vector<unique_ptr<Layers::LayerContext>> layerContexts;
-
-        Tensor scratchBufferA;
-        Tensor scratchBufferB;
-    };
-
     class Sequential : public Model
     {
     public:
@@ -43,8 +35,8 @@ namespace NN::Models
         void Fit(int epochs, ImageDataGenerator& trainData, ImageDataGenerator& testData);
 
     protected:
-        Tensor Run(const Tensor& input, WorkerContext& worker);
-        Tensor Backpropagation(Tensor gradient, WorkerContext& worker);
+        //Tensor Run(const Tensor& input, Layers::WorkerContext& worker);
+        //Tensor Backpropagation(Tensor gradient, Layers::WorkerContext& worker);
         void ApplyGradients(int batchSize);
 
         float Evaluate(ImageDataGenerator& testData);
@@ -58,7 +50,11 @@ namespace NN::Models
         //Optimizer optimizer_;
         float learningRate_;
 
-        vector<WorkerContext> workers_;
+        //first index: which layer, second index: which worker.
+        std::vector<std::vector<std::unique_ptr<Layers::LayerContext>>> workerContexts_;
+
+        //I want to hand over the inner vector of per layer
+        //vector<Layers::WorkerContext> workers_;
 
         //Thread pool shared by Fit() and Evaluate().
         WorkerPool workerPool_;

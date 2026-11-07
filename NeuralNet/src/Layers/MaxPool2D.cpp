@@ -60,9 +60,33 @@ namespace NN::Layers
         return { outputHeight, outputWidth, channels };
     }
 
-    void MaxPool2D::Run(const Tensor& input, Tensor& output, LayerContext& context)
+    void MaxPool2D::RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
     {
-        auto& poolContext = dynamic_cast<MaxPool2DContext&>(context);
+        vector<WorkerPool::Job> jobs;
+        jobs.reserve(batchSize);
+
+        imageContexts_.clear();
+        imageContexts_.resize(batchSize);
+
+        //For each image in the batch add it to the jobs list for the threads or workers to handle
+        for (size_t i = 0; i < batchSize; i++)
+        {
+            jobs.emplace_back([this, &batch, &contexts, i](size_t workerIndex)
+                {
+                    ImageLabel& image = batch.imageLabels[i];
+
+                    //Forward pass using this worker's contexts.
+                    Run(image.image, *contexts[workerIndex], imageContexts_[i]);
+                });
+        }
+
+        workerPool.SubmitJobs(std::move(jobs));
+        workerPool.WaitForJobs();
+    }
+
+    void MaxPool2D::Run(Tensor& source, LayerContext& gradientContext, MaxPool2DImageContext& imageContext)
+    {
+        auto& poolContext = dynamic_cast<MaxPool2DContext&>(gradientContext);
 
         const size_t inputHeight = inputShape_[0];
         const size_t inputWidth = inputShape_[1];
@@ -72,14 +96,17 @@ namespace NN::Layers
         const size_t outputHeight = outputShape[0];
         const size_t outputWidth = outputShape[1];
 
+        //Maybe can just calculate the size and set it to read and write to the same vector if it doesnt change it?
+        Tensor output(outputShape);
+
         output.ReshapeAndResize(outputShape);
         const size_t outputSize = output.GetSize();
 
-        poolContext.maxIndices.resize(outputSize);
+        imageContext.maxIndices.resize(outputSize);
 
-        const float* inData = input.GetData().data();
+        const float* inData = source.GetData().data();
         float* outData = output.GetData().data();
-        size_t* maxIdxData = poolContext.maxIndices.data();
+        size_t* maxIdxData = imageContext.maxIndices.data();
 
         ptrdiff_t padTop = 0;
         ptrdiff_t padLeft = 0;
@@ -143,24 +170,51 @@ namespace NN::Layers
                 }
             }
         }
+
+        //set input
+        source = std::move(output);
     }
 
-    void MaxPool2D::Backpropagate(const Tensor& input, Tensor& output, LayerContext& context)
+    void MaxPool2D::Run(Tensor& source, LayerContext& context)
     {
-        auto& poolContext = dynamic_cast<MaxPool2DContext&>(context);
+        throw std::invalid_argument("This Run is not implemented.");
+    }
 
-        const size_t gradSize = input.GetSize();
+    void MaxPool2D::BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
+    {
+        vector<WorkerPool::Job> jobs;
+        jobs.reserve(batchSize);
+
+        //For each image in the batch add it to the jobs list for the threads or workers to handle
+        for (size_t i = 0; i < batchSize; i++)
+        {
+            jobs.emplace_back([this, &batchGradients, &contexts, i](size_t workerIndex)
+                {
+                    //Forward pass using this worker's contexts.
+                    Backpropagate(batchGradients[i], *contexts[workerIndex], imageContexts_[i]);
+                });
+        }
+
+        workerPool.SubmitJobs(std::move(jobs));
+        workerPool.WaitForJobs();
+    }
+
+    void MaxPool2D::Backpropagate(Tensor& gradient, LayerContext& gradientContext, MaxPool2DImageContext& imageContext)
+    {
+        auto& poolContext = dynamic_cast<MaxPool2DContext&>(gradientContext);
+
+        const size_t gradSize = gradient.GetSize();
         const size_t totalInputElements = inputShape_[0] * inputShape_[1] * inputShape_[2];
 
-        output.ReshapeAndResize(inputShape_);
+        Tensor outGradient(inputShape_);
 
         // 2. Extract vector references securely
-        const auto& gradData = input.GetData(); // 'source' holds incoming gradients from the next layer
-        auto& inGradData = output.GetData();   // 'dest' is our destination scratch canvas
-        const auto& maxIdxData = poolContext.maxIndices;
+        const auto& inGradData = gradient.GetData(); // 'source' holds incoming gradients from the next layer
+        auto& outGradData = outGradient.GetData();   // 'dest' is our destination scratch canvas
+        const auto& maxIdxData = imageContext.maxIndices;
 
         // 3. Fast contiguous buffer zeroing
-        std::fill(inGradData.begin(), inGradData.end(), 0.0f);
+        std::fill(outGradData.begin(), outGradData.end(), 0.0f);
 
         // 4. O(N) Sequential Scatter:
         // Simply route the incoming gradient error elements directly to their tracked flat destination positions.
@@ -168,8 +222,15 @@ namespace NN::Layers
         for (size_t i = 0; i < gradSize; ++i)
         {
             const size_t targetFlatInputIndex = maxIdxData[i];
-            inGradData[targetFlatInputIndex] += gradData[i];
+            outGradData[targetFlatInputIndex] += inGradData[i];
         }
+
+        gradient = std::move(outGradient);
+    }
+
+    void MaxPool2D::Backpropagate(Tensor& gradient, LayerContext& context)
+    {
+        throw std::invalid_argument("This Backpropagate is not implemented.");
     }
 
     // Pooling layers do not have weights or biases, so these methods are cleanly empty.

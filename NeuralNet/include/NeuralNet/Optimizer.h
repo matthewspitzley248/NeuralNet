@@ -13,19 +13,28 @@ namespace NN
         Adam
     };
 
+    struct AdamLayerContext
+    {
+        Tensor m;
+        Tensor v;
+    };
+
     class Optimizer
     {
     public:
         Optimizer() = default;
         Optimizer(OptimizerType type, float learningRate = 0.001f);
 
-        void Apply(Tensor& parameters, const Tensor& gradients, int batchSize);
+        void Apply(Tensor& parameters, const Tensor& gradients, int batchSize, AdamLayerContext& adamContext);
 
         void UpdateLearningRate(float learningRate);
 
         void IncrementTimeStep() { t_++; }
 
     protected:
+
+        void Adam(Tensor& parameters, const Tensor& gradients, int batchSize, AdamLayerContext& adamContext);
+
         OptimizerType type_;
         float learningRate_;
         
@@ -36,8 +45,8 @@ namespace NN
 
         // Uses the parameter's raw data pointer address as a unique key 
         // to map to its corresponding m and v state buffers.
-        std::unordered_map<void*, Tensor> adamM_;
-        std::unordered_map<void*, Tensor> adamV_;
+        //std::unordered_map<void*, Tensor> adamM_;
+        //std::unordered_map<void*, Tensor> adamV_;
 
         // Tracks the time-step (number of batches processed) for bias corrections
         int t_ = 0;

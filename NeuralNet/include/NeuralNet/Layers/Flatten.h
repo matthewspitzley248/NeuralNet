@@ -6,7 +6,6 @@ namespace NN::Layers
 {
     struct FlattenContext : LayerContext
     {
-        Tensor inputShape;
     };
 
     class Flatten : public Layer
@@ -20,9 +19,13 @@ namespace NN::Layers
 
         std::vector<size_t> GetOutputShape(const std::vector<size_t>& inputShape) override;
 
-        void Run(const Tensor& input, Tensor& output, LayerContext& context) override;
+        void RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) override;
 
-        void Backpropagate(const Tensor& input, Tensor& output, LayerContext& context) override;
+        void Run(Tensor& source, LayerContext& context) override;
+
+        void BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) override;
+
+        void Backpropagate(Tensor& gradient, LayerContext& context) override;
 
         void ApplyGradients(Optimizer& optimizer, int batchSize) override;
 

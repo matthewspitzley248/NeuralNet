@@ -43,11 +43,6 @@ namespace NN::Models
         }
 
         CreateWorkers(threadCount);
-
-        for (WorkerContext& worker : workers_) {
-            worker.scratchBufferA = Tensor({ maxElements });
-            worker.scratchBufferB = Tensor({ maxElements });
-        }
     }
 
     void Sequential::Fit(int epochs, ImageDataGenerator& trainData, ImageDataGenerator& testData)
@@ -78,37 +73,52 @@ namespace NN::Models
                 //Clear the gradients accumulated during previous batches.
                 ResetWorkerGradients();
 
+                //each layer handles its own run pass. It then waits for the layer to finish what it wants before starting the next layer
+                // output is overwritten into the ImageBatch batch image Tensor
+                //Later will want to change this to have less stops and waits
+                //Will want to have it so it gos through all layers until it hits a layer that wants a stop (batch normalization) and loop that 
+                for (size_t i = 0; i < layers_.size(); i++)
+                {
+                    layers_[i]->RunBatch(batch, batchSize, workerContexts_[i], workerPool_);
+
+                    workerPool_.WaitForJobs();
+                }
+
+
+
+
                 //Store each image's loss separately so workers never write to the same loss variable.
                 alignas(64) vector<float> imageLosses(batchSize, 0.0f);
 
+                //Now get the gradients for the images to send to backprop
+                vector<Tensor> batchGradients(batchSize);
                 vector<WorkerPool::Job> jobs;
                 jobs.reserve(batchSize);
 
-                //For each image in the batch add it to the jobs list for the threads or workers to handle
                 for (size_t i = 0; i < batchSize; i++)
                 {
-                    jobs.emplace_back([this, &batch, &imageLosses, i](size_t workerIndex)
+                    jobs.emplace_back([this, &batch, &imageLosses, &batchGradients, i](size_t workerIndex)
                         {
+                            //This now contains the prediction and the label for what the correct would be
                             const ImageLabel& item = batch.imageLabels[i];
-                            WorkerContext& worker = workers_[workerIndex];
 
-                            //Forward pass using this worker's contexts.
-                            Tensor prediction = Run(item.image, worker);
+                            imageLosses[i] = loss_.Calculate(item.image, item.labelIndex, lossType_);
 
-                            //Calculate the image's loss.
-                            imageLosses[i] = loss_.Calculate(prediction, item.labelIndex, lossType_);
-
-                            //Calculate loss gradient.
-                            Tensor gradient = loss_.CalculateGradient(prediction, item.labelIndex, lossType_);
-
-                            //Backpropagate into this worker's gradient buffers.
-                            Backpropagation(move(gradient), worker);
+                            batchGradients[i] = loss_.CalculateGradient(item.image, item.labelIndex, lossType_);
                         });
                 }
 
-                //Execute all images using the shared worker pool.
                 workerPool_.SubmitJobs(move(jobs));
                 workerPool_.WaitForJobs();
+
+
+                //Now each layer handles its own Backpropagate same as run
+                for (size_t i = layers_.size(); i > 0; i--)
+                {
+                    layers_[i - 1]->BackpropagateBatch(batchGradients, batchSize, workerContexts_[i - 1], workerPool_);
+
+                    workerPool_.WaitForJobs();
+                }
 
                 //Sum the losses after all jobs have finished.
                 // Vectorized Reductions: Faster data consolidation using standard pipelines
@@ -158,6 +168,14 @@ namespace NN::Models
         {
             const size_t batchSize = batch.imageLabels.size();
 
+            for (size_t i = 0; i < layers_.size(); i++)
+            {
+                layers_[i]->RunBatch(batch, batchSize, workerContexts_[i], workerPool_);
+
+                workerPool_.WaitForJobs();
+            }
+
+
             // Cache Alignment Optimization: Pad and structure arrays to clear CPU cache line dependencies
             alignas(64) vector<float> imageLosses(batchSize, 0.0f);
             alignas(64) vector<int> correct(batchSize, 0);
@@ -169,42 +187,32 @@ namespace NN::Models
             {
                 jobs.emplace_back([this, &batch, &imageLosses, &correct, i](size_t workerIndex)
                     {
+                        //This now contains the prediction and the label for what the correct would be
                         const ImageLabel& item = batch.imageLabels[i];
-                        WorkerContext& worker = workers_[workerIndex];
-                        //printf("[Worker %zu][Image %zu] Starting job. Label index: %d\n", workerIndex, i, item.labelIndex);
-
-                        //Forward pass using this worker's contexts.
-                        Tensor prediction = Run(item.image, worker);
-                        //printf("[Worker %zu][Image %zu] Forward pass complete. Output size: %zu\n", workerIndex, i, prediction.GetSize());
 
                         //Calculate the image's loss.
-                        imageLosses[i] = loss_.Calculate(prediction, item.labelIndex, lossType_);
-                        //printf("[Worker %zu][Image %zu] Loss calculated: %.6f\n", workerIndex, i, imageLosses[i]);
+                        imageLosses[i] = loss_.Calculate(item.image, item.labelIndex, lossType_);
 
                         // Find the predicted class.
                         int predictedLabel = 0;
 
                         // SIMD Prediction Parsing Optimization:
                         // Extracting raw data lets standard pointers leverage specialized assembly vector scanning
-                        const float* predData = prediction.GetData().data();
-                        const size_t predSize = prediction.GetSize();
+                        const float* predData = item.image.GetData().data();
+                        const size_t predSize = item.image.GetSize();
 
                         if (predSize > 0)
                         {
                             // std::max_element compiles directly to ultra-fast hardware tracking loops
                             const float* maxPtr = std::max_element(predData, predData + predSize);
-                            int predictedLabel = static_cast<int>(maxPtr - predData);
+                            predictedLabel = static_cast<int>(maxPtr - predData);
 
                             correct[i] = (predictedLabel == item.labelIndex) ? 1 : 0;
                         }
-
-                        //printf("[Worker %zu][Image %zu] Predicted class: %d, Actual class: %d\n", workerIndex, i, predictedLabel, item.labelIndex);
-                        //printf("[Worker %zu][Image %zu] Prediction %s. Job finished.\n", workerIndex, i, correct[i] ? "correct" : "incorrect");
                     });
             }
 
-            // Process the batch using the shared worker pool.
-            workerPool_.SubmitJobs(std::move(jobs));
+            workerPool_.SubmitJobs(move(jobs));
             workerPool_.WaitForJobs();
 
             // Aggregate results after all jobs have completed.
@@ -222,66 +230,20 @@ namespace NN::Models
         return accuracy;
     }
 
-    Tensor Sequential::Run(const Tensor& input, WorkerContext& worker)
-    {
-        // Start by copying the raw input image data into our first scratch buffer
-        worker.scratchBufferA.ReshapeAndResize(input.GetShape());
-        std::copy(input.GetData().begin(), input.GetData().end(), worker.scratchBufferA.GetData().begin());
-
-        // Pointers to alternate back and forth between the two pre-allocated spaces
-        Tensor* currentSource = &worker.scratchBufferA;
-        Tensor* currentDest = &worker.scratchBufferB;
-
-        for (size_t i = 0; i < layers_.size(); ++i)
-        {
-            // Pass the references directly. The layer computes math out of 'currentSource'
-            // and overwrites 'currentDest' completely in-place.
-            layers_[i]->Run(*currentSource, *currentDest, *worker.layerContexts[i]);
-
-            // Swap the pointers for the next layer (Ping-Pong)
-            std::swap(currentSource, currentDest);
-        }
-
-        // Return a copy of the final prediction vector (usually very small, e.g., 10 or 100 classes)
-        return *currentSource;
-    }
-
-    Tensor Sequential::Backpropagation(Tensor gradient, WorkerContext& worker)
-    {
-        // Copy the incoming loss gradient into our first scratch buffer
-        worker.scratchBufferA.ReshapeAndResize(gradient.GetShape());
-        std::copy(gradient.GetData().begin(), gradient.GetData().end(), worker.scratchBufferA.GetData().begin());
-
-        Tensor* currentSource = &worker.scratchBufferA;
-        Tensor* currentDest = &worker.scratchBufferB;
-
-        // Stream backward from the last layer down to the first
-        for (size_t i = layers_.size(); i > 0; i--)
-        {
-            layers_[i - 1]->Backpropagate(*currentSource, *currentDest, *worker.layerContexts[i - 1]);
-
-            // Swap the pointers for the next backward layer step
-            std::swap(currentSource, currentDest);
-        }
-
-        // Returns the ultimate gradient for the input image layers
-        return *currentSource;
-    }
-
     void Sequential::CreateWorkers(int workerCount)
     {
         //Remove existing workers and recreate with the size
-        workers_.clear();
-        workers_.resize(workerCount);
+        workerContexts_.clear();
+        workerContexts_.resize(layers_.size());
 
-        //For each worker give it the layer contexts
-        for (WorkerContext& worker : workers_)
+        for (size_t i = 0; i < layers_.size(); i++)
         {
-            worker.layerContexts.reserve(layers_.size());
+            auto& contexts = workerContexts_[i];
+            contexts.reserve(workerCount);
 
-            for (const auto& layer : layers_)
+            for (int j = 0; j < workerCount; j++)
             {
-                worker.layerContexts.push_back(layer->CreateContext());
+                contexts.push_back(layers_[i]->CreateContext());
             }
         }
 
@@ -291,11 +253,11 @@ namespace NN::Models
 
     void Sequential::ResetWorkerGradients()
     {
-        for (WorkerContext& worker : workers_)
+        for (size_t layerIndex = 0; layerIndex < layers_.size(); ++layerIndex)
         {
-            for (size_t i = 0; i < layers_.size(); ++i)
+            for (auto& context : workerContexts_[layerIndex])
             {
-                layers_[i]->ResetGradients(*worker.layerContexts[i]);
+                layers_[layerIndex]->ResetGradients(*context);
             }
         }
     }
@@ -305,14 +267,13 @@ namespace NN::Models
         vector<WorkerPool::Job> jobs;
         jobs.reserve(layers_.size());
 
-        for (size_t i = 0; i < layers_.size(); i++)
+        for (size_t i = 0; i < layers_.size(); ++i)
         {
             jobs.emplace_back([this, i](size_t workerIndex)
                 {
-                    // Accumulate gradients from every worker for this layer.
-                    for (WorkerContext& worker : workers_)
+                    for (auto& context : workerContexts_[i])
                     {
-                        layers_[i]->AccumulateGradients(*worker.layerContexts[i]);
+                        layers_[i]->AccumulateGradients(*context);
                     }
                 });
         }

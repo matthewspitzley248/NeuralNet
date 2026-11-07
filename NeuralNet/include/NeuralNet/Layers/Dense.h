@@ -6,14 +6,19 @@ namespace NN::Layers
 {
     struct DenseContext : LayerContext
     {
-        //Forward pass info
-        Tensor input;
-        Tensor output;
-
         //Accumulated gradients
         Tensor weightGradients;
         Tensor biasGradients;
         Tensor activationGradient;
+    };
+
+    struct DenseImageContext
+    {
+        //Forward pass info
+        Tensor input;
+        Tensor output;
+
+        //Tensor activationGradient;
     };
 
     class Dense : public Layer
@@ -32,9 +37,13 @@ namespace NN::Layers
 
         std::vector<size_t> GetOutputShape(const std::vector<size_t>& inputShape) override;
 
-        void Run(const Tensor& input, Tensor& output, LayerContext& context) override;
+        void RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) override;
 
-        void Backpropagate(const Tensor& input, Tensor& output, LayerContext& context) override;
+        void Run(Tensor& source, LayerContext& context) override;
+
+        void BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) override;
+
+        void Backpropagate(Tensor& gradient, LayerContext& context) override;
 
         void ApplyGradients(Optimizer& optimizer, int batchSize) override;
 
@@ -43,8 +52,15 @@ namespace NN::Layers
         void AccumulateGradients(LayerContext& context) override;
 
     protected:
+        //DenseImageContext CreateBatchContext() const;
+
+        void Run(Tensor& source, LayerContext& gradientContext, DenseImageContext& imageContext);
+        void Backpropagate(Tensor& gradient, LayerContext& gradientContext, DenseImageContext& imageContext);
+
         size_t units_;
         ActivationType activationType_;
+
+        std::vector<DenseImageContext> imageContexts_;
 
         //Tensor lastInput_;
         //Tensor lastOutput_;

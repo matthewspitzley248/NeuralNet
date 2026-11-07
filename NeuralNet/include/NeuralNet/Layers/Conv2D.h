@@ -9,9 +9,6 @@ namespace NN::Layers
 {
     struct Conv2DContext : LayerContext
     {
-        Tensor input;
-        Tensor output;
-
         //Accumulated gradients
         Tensor weightGradients;
         Tensor biasGradients;
@@ -21,6 +18,13 @@ namespace NN::Layers
         Tensor columnsCache;
         Tensor transposedGradCache;
         Tensor columnGradCache;
+    };
+
+    struct Conv2DImageContext
+    {
+        //Forward pass info
+        Tensor input;
+        Tensor output;
     };
 
     class Conv2D : public Layer
@@ -40,9 +44,13 @@ namespace NN::Layers
 
         std::vector<size_t> GetOutputShape(const std::vector<size_t>& inputShape) override;
 
-        void Run(const Tensor& input, Tensor& output, LayerContext& context) override;
+        void RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) override;
 
-        void Backpropagate(const Tensor& input, Tensor& output, LayerContext& context) override;
+        void Run(Tensor& source, LayerContext& context) override;
+
+        void BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) override;
+
+        void Backpropagate(Tensor& gradient, LayerContext& context) override;
 
         void ApplyGradients(Optimizer& optimizer, int batchSize) override;
 
@@ -52,6 +60,11 @@ namespace NN::Layers
          
     protected:
         void UpdateTransposedWeightsCache();
+
+        void Run(Tensor& source, LayerContext& gradientContext, Conv2DImageContext& imageContext);
+        void Backpropagate(Tensor& gradient, LayerContext& gradientContext, Conv2DImageContext& imageContext);
+
+        std::vector<Conv2DImageContext> imageContexts_;
 
         size_t filters_;
         std::pair<size_t, size_t> kernelSize_;

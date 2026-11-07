@@ -137,16 +137,16 @@ int main()
 
     //cout << filesystem::current_path() << '\n';
 
-    Tensor image = imgLoader.Load(string("Dataset/testImage.png"));
+    //Tensor image = imgLoader.Load(string("Dataset/testImage.png"));
 
-    vector<size_t> inputShape = image.GetShape();
+    //vector<size_t> inputShape = image.GetShape();
 
-    printf("Image shape: ");
+    /*printf("Image shape: ");
     for (size_t dimension : inputShape)
     {
         printf("%zu ", dimension);
     }
-    printf("\n");
+    printf("\n");*/
 
     //testWorkerPool();
 
@@ -170,14 +170,14 @@ int main()
 
     // Training settings
     GeneratorSettings trainGenSettings;
-    trainGenSettings.directory = "Dataset/Data/train";
+    trainGenSettings.directory = "Dataset/Data2/train";
     trainGenSettings.batchSize = 32;
     trainGenSettings.classMode = ClassMode::Categorical;
     trainGenSettings.shuffle = true;
 
     // Test settings
     GeneratorSettings testGenSettings;
-    testGenSettings.directory = "Dataset/Data/test";
+    testGenSettings.directory = "Dataset/Data2/test";
     testGenSettings.batchSize = 64;
     testGenSettings.classMode = ClassMode::Categorical;
     testGenSettings.shuffle = false;
@@ -187,6 +187,12 @@ int main()
 
 
 
+    printf("Image shape: ");
+    for (size_t dimension : testImageGen.GetImageSize())
+    {
+        printf("%zu ", dimension);
+    }
+    printf("\n");
 
 
 
@@ -198,7 +204,7 @@ int main()
 
     //model.Add<Conv2D>(5, pair{3, 3}, pair{1, 1}, ActivationType::Relu, Padding::Same);
     //model.Add<Conv2D>(25, pair{ 5, 5 }, pair{ 1, 1 }, ActivationType::Relu, Padding::Same);
-    model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 },  Padding::Same);
+    //model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 },  Padding::Same);
 
     //model.Add<Conv2D>(50, pair{ 5, 5 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
     model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Same);

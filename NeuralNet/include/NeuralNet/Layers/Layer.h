@@ -5,6 +5,8 @@
 #include <NeuralNet/Activation.h>
 #include <NeuralNet/Optimizer.h>
 #include <random>
+#include <NeuralNet/WorkerPool.h>
+#include <NeuralNet/ImageDataGenerator.h>
 
 namespace NN::Layers
 {
@@ -22,8 +24,10 @@ namespace NN::Layers
 
         virtual void Initialize(mt19937& generator, const vector<size_t>& inputShape) = 0;
         virtual vector<size_t> GetOutputShape(const vector<size_t>& inputShape) = 0;
-        virtual void Run(const Tensor& source, Tensor& dest, LayerContext& context) = 0;
-        virtual void Backpropagate(const Tensor& input, Tensor& output, LayerContext& context) = 0;
+        virtual void RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) = 0;
+        virtual void Run(Tensor& source, LayerContext& context) = 0;
+        virtual void BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) = 0;
+        virtual void Backpropagate(Tensor& gradient, LayerContext& context) = 0;
         virtual void ApplyGradients(Optimizer& optimizer, int batchSize) = 0;
         virtual void ResetGradients(LayerContext& context) = 0;
         virtual void AccumulateGradients(LayerContext& context) = 0;
@@ -37,5 +41,8 @@ namespace NN::Layers
         Tensor biasGradients_;
 
         Activation activation_;
+
+        AdamLayerContext adamContextWeight_;
+        AdamLayerContext adamContextBias_;
     };
 }

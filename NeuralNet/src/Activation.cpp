@@ -91,7 +91,10 @@ namespace NN
         const size_t size = postActivation.GetSize();
         if (size != gradient.GetSize())
         {
-            throw std::invalid_argument("Post-activation and gradient must have the same size.");
+            throw std::invalid_argument("Post-activation and gradient must have the same size. "
+                "Post-activation size: " + std::to_string(size) +
+                ", gradient size: " + std::to_string(gradient.GetSize())
+            );
         }
 
         // ZERO ALLOCATION: Reuse the context's pre-allocated destination tracking block

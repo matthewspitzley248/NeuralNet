@@ -29,25 +29,55 @@ namespace NN::Layers
         return { totalSize };
     }
 
-    void Flatten::Run(const Tensor& input, Tensor& output, LayerContext& context)
+    void Flatten::RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
     {
-        const size_t totalElements = input.GetSize();
+        vector<WorkerPool::Job> jobs;
+        jobs.reserve(batchSize);
 
-        // 1. Force the destination buffer size to match without hitting the OS heap
-        output.ReshapeAndResize({ totalElements });
+        //For each image in the batch add it to the jobs list for the threads or workers to handle
+        for (size_t i = 0; i < batchSize; i++)
+        {
+            jobs.emplace_back([this, &batch, &contexts, i](size_t workerIndex)
+                {
+                    ImageLabel& image = batch.imageLabels[i];
 
-        // 2. Direct fast block memory copy (or pointer swap if optimized further)
-        std::copy_n(input.GetData().data(), totalElements, output.GetData().data());
+                    //Forward pass using this worker's contexts.
+                    Run(image.image, *contexts[workerIndex]);
+                });
+        }
+
+        workerPool.SubmitJobs(std::move(jobs));
+        workerPool.WaitForJobs();
     }
 
-    void Flatten::Backpropagate(const Tensor& input, Tensor& output, LayerContext& context)
+    void Flatten::Run(Tensor& source, LayerContext& context)
     {
-        output.ReshapeAndResize(inputShape_);
+        //Force the destination buffer size to match without hitting the OS heap
+        source.SetShape({ source.GetSize() });
+    }
 
-        // 3. Fast contiguous raw block copy from the source gradient to the destination buffer.
-        // Since flattening doesn't change any mathematical numbers, this is a clean L1/L2 cache stream.
-        const size_t totalElements = input.GetSize();
-        std::copy_n(input.GetData().data(), totalElements, output.GetData().data());
+    void Flatten::BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
+    {
+        vector<WorkerPool::Job> jobs;
+        jobs.reserve(batchSize);
+
+        //For each image in the batch add it to the jobs list for the threads or workers to handle
+        for (size_t i = 0; i < batchSize; i++)
+        {
+            jobs.emplace_back([this, &batchGradients, &contexts, i](size_t workerIndex)
+                {
+                    //Forward pass using this worker's contexts.
+                    Backpropagate(batchGradients[i], *contexts[workerIndex]);
+                });
+        }
+
+        workerPool.SubmitJobs(std::move(jobs));
+        workerPool.WaitForJobs();
+    }
+
+    void Flatten::Backpropagate(Tensor& gradient, LayerContext& context)
+    {
+        gradient.ReshapeAndResize(inputShape_);
     }
 
     void Flatten::ApplyGradients(Optimizer& optimizer, int batchSize)
