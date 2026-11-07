@@ -149,7 +149,6 @@
   <ItemGroup>
     <ClCompile Include="include\NeuralNet\Layers\Layer.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="Math.cpp" />
     <ClCompile Include="src\Activation.cpp" />
     <ClCompile Include="src\ImageDataGenerator.cpp" />
     <ClCompile Include="src\ImageLoader.cpp" />
@@ -158,6 +157,7 @@
     <ClCompile Include="src\Layers\Flatten.cpp" />
     <ClCompile Include="src\Layers\MaxPool2D.cpp" />
     <ClCompile Include="src\Loss.cpp" />
+    <ClCompile Include="src\Math.cpp" />
     <ClCompile Include="src\Models\Model.cpp" />
     <ClCompile Include="src\Models\Sequential.cpp" />
     <ClCompile Include="src\NeuralNet.cpp" />
