@@ -47,6 +47,8 @@ namespace NN::Models
 
     void Sequential::Fit(int epochs, ImageDataGenerator& trainData, ImageDataGenerator& testData)
     {
+        SetTraining(true);
+
         for (int epoch = 0; epoch < epochs; epoch++)
         {
             printf("\n========== Epoch %d/%d ==========\n", epoch + 1, epochs);
@@ -149,15 +151,30 @@ namespace NN::Models
             printf("Epoch %d/%d - Loss: %.4f\n", epoch + 1, epochs, averageLoss);
 
             printf("[Epoch %d] Starting evaluation...\n", epoch + 1);
+            SetTraining(false);
             Evaluate(testData);
+            SetTraining(true);
             printf("[Epoch %d] Evaluation complete.\n", epoch + 1);
         }
 
         printf("\n[Fit] Training finished.\n");
     }
 
+    void Sequential::SetTraining(bool training)
+    {
+        training_ = training;
+
+        for (auto& layer : layers_)
+        {
+            layer->SetTraining(training);
+        }
+
+    }
+
     float Sequential::Evaluate(ImageDataGenerator& testData)
     {
+        SetTraining(false);
+
         testData.NewEpoch();
 
         float totalLoss = 0.0f;

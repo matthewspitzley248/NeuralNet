@@ -26,6 +26,11 @@ namespace NN::Models
 
         Model(std::vector<size_t> inputShape_, std::mt19937& generator);
 
+        virtual void SetTraining(bool training)
+        {
+            training_ = training;
+        }
+
         //virtual Tensor Run(const Tensor& input) = 0;
 
         //virtual void Initialize(std::mt19937& generator) = 0;
@@ -40,5 +45,7 @@ namespace NN::Models
         Loss loss_;
         Optimizer optimizer_;
         std::vector<Metric> metrics_;
+
+        bool training_ = false;
     };
 }

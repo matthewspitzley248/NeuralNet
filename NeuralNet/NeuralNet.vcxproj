@@ -131,6 +131,7 @@
     <ClInclude Include="include\NeuralNet\Layers.h" />
     <ClInclude Include="include\NeuralNet\Layers\Conv2D.h" />
     <ClInclude Include="include\NeuralNet\Layers\Dense.h" />
+    <ClInclude Include="include\NeuralNet\Layers\Dropout.h" />
     <ClInclude Include="include\NeuralNet\Layers\Flatten.h" />
     <ClInclude Include="include\NeuralNet\Layers\Layer.h" />
     <ClInclude Include="include\NeuralNet\Layers\MaxPool2D.h" />
@@ -154,6 +155,7 @@
     <ClCompile Include="src\ImageLoader.cpp" />
     <ClCompile Include="src\Layers\Conv2D.cpp" />
     <ClCompile Include="src\Layers\Dense.cpp" />
+    <ClCompile Include="src\Layers\Dropout.cpp" />
     <ClCompile Include="src\Layers\Flatten.cpp" />
     <ClCompile Include="src\Layers\MaxPool2D.cpp" />
     <ClCompile Include="src\Loss.cpp" />

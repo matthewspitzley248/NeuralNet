@@ -7,3 +7,4 @@
 #include <NeuralNet/Layers/MaxPool2D.h>
 #include <NeuralNet/Layers/Flatten.h>
 #include <NeuralNet/Layers/Dense.h>
+#include <NeuralNet/Layers/Dropout.h>

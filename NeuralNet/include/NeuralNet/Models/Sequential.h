@@ -34,6 +34,9 @@ namespace NN::Models
 
         void Fit(int epochs, ImageDataGenerator& trainData, ImageDataGenerator& testData);
 
+        void SetTraining(bool training) override;
+        
+
     protected:
         //Tensor Run(const Tensor& input, Layers::WorkerContext& worker);
         //Tensor Backpropagation(Tensor gradient, Layers::WorkerContext& worker);

@@ -170,14 +170,14 @@ int main()
 
     // Training settings
     GeneratorSettings trainGenSettings;
-    trainGenSettings.directory = "Dataset/Data2/train";
+    trainGenSettings.directory = "Dataset/Data/train";
     trainGenSettings.batchSize = 32;
     trainGenSettings.classMode = ClassMode::Categorical;
     trainGenSettings.shuffle = true;
 
     // Test settings
     GeneratorSettings testGenSettings;
-    testGenSettings.directory = "Dataset/Data2/test";
+    testGenSettings.directory = "Dataset/Data/test";
     testGenSettings.batchSize = 64;
     testGenSettings.classMode = ClassMode::Categorical;
     testGenSettings.shuffle = false;
@@ -204,7 +204,7 @@ int main()
 
     //model.Add<Conv2D>(5, pair{3, 3}, pair{1, 1}, ActivationType::Relu, Padding::Same);
     //model.Add<Conv2D>(25, pair{ 5, 5 }, pair{ 1, 1 }, ActivationType::Relu, Padding::Same);
-    //model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 },  Padding::Same);
+    model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 },  Padding::Same);
 
     //model.Add<Conv2D>(50, pair{ 5, 5 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
     model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Same);
@@ -215,6 +215,7 @@ int main()
     model.Add<Flatten>();
     model.Add<Dense>(100, ActivationType::Relu);
     model.Add<Dense>(100, ActivationType::Relu);
+    model.Add<Dropout>(0.25f);
     //output layer
     model.Add<Dense>(trainImageGen.GetLabelSize(), ActivationType::Softmax);
 

@@ -32,6 +32,11 @@ namespace NN::Layers
         virtual void ResetGradients(LayerContext& context) = 0;
         virtual void AccumulateGradients(LayerContext& context) = 0;
 
+        virtual void SetTraining(bool training)
+        {
+            training_ = training;
+        }
+
     protected:
         Tensor weights_;
         Tensor biases_;
@@ -44,5 +49,7 @@ namespace NN::Layers
 
         AdamLayerContext adamContextWeight_;
         AdamLayerContext adamContextBias_;
+
+        bool training_ = false;
     };
 }
