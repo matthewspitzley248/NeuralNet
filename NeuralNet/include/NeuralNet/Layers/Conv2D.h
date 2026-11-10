@@ -7,7 +7,7 @@
 
 namespace NN::Layers
 {
-    struct Conv2DContext : LayerContext
+    struct Conv2DContext : WorkerContext
     {
         //Accumulated gradients
         Tensor weightGradients;
@@ -20,7 +20,7 @@ namespace NN::Layers
         Tensor columnGradCache;
     };
 
-    struct Conv2DImageContext
+    struct Conv2DImageContext : ImageContext
     {
         //Forward pass info
         Tensor input;
@@ -38,33 +38,27 @@ namespace NN::Layers
             Padding padding = Padding::Valid
         );
 
-        unique_ptr<LayerContext> CreateContext() const override;
+        unique_ptr<WorkerContext> CreateWorkerContext() const override;
 
         void Initialize(std::mt19937& generator, const std::vector<size_t>& inputShape) override;
 
-        std::vector<size_t> GetOutputShape(const std::vector<size_t>& inputShape) override;
+        std::vector<size_t> GetOutputShape(const std::vector<size_t>& inputShape) const override;
 
-        void RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) override;
-
-        void Run(Tensor& source, LayerContext& context) override;
-
-        void BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool) override;
-
-        void Backpropagate(Tensor& gradient, LayerContext& context) override;
+        void Run(Tensor& data) override;
 
         void ApplyGradients(Optimizer& optimizer, int batchSize) override;
 
-        void ResetGradients(LayerContext& context) override;
+        void ResetGradients(WorkerContext& workerContext) override;
 
-        void AccumulateGradients(LayerContext& context) override;
+        void AccumulateGradients(WorkerContext& workerContext) override;
          
     protected:
         void UpdateTransposedWeightsCache();
 
-        void Run(Tensor& source, LayerContext& gradientContext, Conv2DImageContext& imageContext);
-        void Backpropagate(Tensor& gradient, LayerContext& gradientContext, Conv2DImageContext& imageContext);
+        void Run(Tensor& data, WorkerContext& workerContext, ImageContext& imageContext) override;
+        void Backpropagate(Tensor& gradient, WorkerContext& workerContext, ImageContext& imageContext) override;
+        unique_ptr<ImageContext> CreateImageContext() const override;
 
-        std::vector<Conv2DImageContext> imageContexts_;
 
         size_t filters_;
         std::pair<size_t, size_t> kernelSize_;

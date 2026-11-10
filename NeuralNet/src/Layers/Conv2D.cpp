@@ -17,7 +17,7 @@ namespace NN::Layers
     {
     }
 
-    unique_ptr<LayerContext> Conv2D::CreateContext() const
+    unique_ptr<WorkerContext> Conv2D::CreateWorkerContext() const
     {
         auto context = make_unique<Conv2DContext>();
 
@@ -25,6 +25,11 @@ namespace NN::Layers
         context->biasGradients = Tensor(biases_.GetShape());
 
         return context;
+    }
+
+    unique_ptr<ImageContext> Conv2D::CreateImageContext() const
+    {
+        return std::make_unique<Conv2DImageContext>();
     }
 
     void Conv2D::Initialize(mt19937& generator, const vector<size_t>& inputShape)
@@ -73,7 +78,7 @@ namespace NN::Layers
         UpdateTransposedWeightsCache();
     }
 
-    vector<size_t> Conv2D::GetOutputShape(const vector<size_t>& inputShape)
+    vector<size_t> Conv2D::GetOutputShape(const vector<size_t>& inputShape) const
     {
         if (inputShape.size() != 3)
             throw invalid_argument("Conv2D expects input shape (height, width, channels).");
@@ -107,35 +112,55 @@ namespace NN::Layers
         return { outputHeight, outputWidth, static_cast<size_t>(filters_) };
     }
 
-    void Conv2D::RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
+    void Conv2D::Run(Tensor& data)
     {
-        vector<WorkerPool::Job> jobs;
-        jobs.reserve(batchSize);
+        const auto& inputShape = data.GetShape();
 
-        imageContexts_.clear();
-        imageContexts_.resize(batchSize);
+        const size_t inputHeight = inputShape[0];
+        const size_t inputWidth = inputShape[1];
 
-        //For each image in the batch add it to the jobs list for the threads or workers to handle
-        for (size_t i = 0; i < batchSize; i++)
+        const size_t kernelHeight = static_cast<size_t>(kernelSize_.first);
+        const size_t kernelWidth = static_cast<size_t>(kernelSize_.second);
+
+        const size_t strideHeight = static_cast<size_t>(strides_.first);
+        const size_t strideWidth = static_cast<size_t>(strides_.second);
+
+        size_t outputHeight = (padding_ == Padding::Same) ?
+            ((inputHeight + strideHeight - 1) / strideHeight) : ((inputHeight - kernelHeight) / strideHeight + 1);
+        size_t outputWidth = (padding_ == Padding::Same) ?
+            ((inputWidth + strideWidth - 1) / strideWidth) : ((inputWidth - kernelWidth) / strideWidth + 1);
+
+        const size_t numFilters = filters_;
+
+        //Continuous spatial image flattening (Pure sequential speed)
+        Tensor columnsCache;
+        NN::Math::Im2Col(data, columnsCache, kernelSize_, strides_, padding_);
+
+        //Compute via GEMM using pre-transposed weight matrix
+        NN::Math::MatrixMultiplication(columnsCache, transposedWeights_, data);
+
+        //Accumulate Biases sequentially (Clean L1/L2 cache streaming)
+        float* outData = data.GetData().data();
+        const float* bData = biases_.GetData().data();
+        const size_t totalElements = data.GetSize();
+
+        for (size_t i = 0; i < totalElements; ++i)
         {
-            jobs.emplace_back([this, &batch, &contexts, i](size_t workerIndex)
-                {
-                    ImageLabel& image = batch.imageLabels[i];
-
-                    //Forward pass using this worker's contexts.
-                    Run(image.image, *contexts[workerIndex], imageContexts_[i]);
-                });
+            outData[i] += bData[i % numFilters];
         }
 
-        workerPool.SubmitJobs(std::move(jobs));
-        workerPool.WaitForJobs();
+        data.SetShape({ outputHeight, outputWidth, numFilters });
+
+        //Apply the activation function in-place directly on the destination scratch tensor
+        activation_.Apply(activationType_, data);
     }
 
-
-    void Conv2D::Run(Tensor& source, LayerContext& gradientContext, Conv2DImageContext& imageContext)
+    void Conv2D::Run(Tensor& data, WorkerContext& workerContext, ImageContext& imageContext)
     {
-        auto& convContext = dynamic_cast<Conv2DContext&>(gradientContext);
-        const auto& inputShape = source.GetShape();
+        auto& convWorkerContext = dynamic_cast<Conv2DContext&>(workerContext);
+        auto& convImageContext = dynamic_cast<Conv2DImageContext&>(imageContext);
+
+        const auto& inputShape = data.GetShape();
 
         const size_t inputHeight = inputShape[0];
         const size_t inputWidth = inputShape[1];
@@ -154,113 +179,48 @@ namespace NN::Layers
         const size_t numFilters = filters_;
 
         // 1. Move input into context
-        imageContext.input.ReshapeAndResize(inputShape);
-        std::copy_n(source.GetData().data(), source.GetSize(), imageContext.input.GetData().data());
+        convImageContext.input.ReshapeAndResize(inputShape);
+        std::copy_n(data.GetData().data(), data.GetSize(), convImageContext.input.GetData().data());
 
         // 2. Continuous spatial image flattening (Pure sequential speed)
-        NN::Math::Im2Col(imageContext.input, convContext.columnsCache, kernelSize_, strides_, padding_);
+        NN::Math::Im2Col(convImageContext.input, convWorkerContext.columnsCache, kernelSize_, strides_, padding_);
 
         // 3. Compute via GEMM using our perfectly cached pre-transposed weight matrix
-        NN::Math::MatrixMultiplication(convContext.columnsCache, transposedWeights_, source);
+        NN::Math::MatrixMultiplication(convWorkerContext.columnsCache, transposedWeights_, data);
 
         // 4. Accumulate Biases sequentially (Clean L1/L2 cache streaming)
-        float* outData = source.GetData().data();
+        float* outData = data.GetData().data();
         const float* bData = biases_.GetData().data();
-        const size_t totalElements = source.GetSize();
+        const size_t totalElements = data.GetSize();
 
         for (size_t i = 0; i < totalElements; ++i)
         {
             outData[i] += bData[i % numFilters];
         }
 
-        source.SetShape({ outputHeight, outputWidth, numFilters });
+        data.SetShape({ outputHeight, outputWidth, numFilters });
 
         // 6. Snapshot the pre-activation state safely for the backward pass
         /*convContext.preActivation.ReshapeAndResize(output.GetShape());
         std::copy_n(outData, totalElements, convContext.preActivation.GetData().data());*/
 
         // 7. Apply the activation function in-place directly on the destination scratch tensor
-        activation_.Apply(activationType_, source);
+        activation_.Apply(activationType_, data);
 
-        imageContext.output.ReshapeAndResize(source.GetShape());
-        std::copy_n(outData, totalElements, imageContext.output.GetData().data());
+        convImageContext.output.ReshapeAndResize(data.GetShape());
+        std::copy_n(outData, totalElements, convImageContext.output.GetData().data());
     }
 
-    void Conv2D::Run(Tensor& source, LayerContext& context)
+    void Conv2D::Backpropagate(Tensor& gradient, WorkerContext& workerContext, ImageContext& imageContext)
     {
-        auto& convContext = dynamic_cast<Conv2DContext&>(context);
-        const auto& inputShape = source.GetShape();
-
-        const size_t inputHeight = inputShape[0];
-        const size_t inputWidth = inputShape[1];
-
-        const size_t kernelHeight = static_cast<size_t>(kernelSize_.first);
-        const size_t kernelWidth = static_cast<size_t>(kernelSize_.second);
-
-        const size_t strideHeight = static_cast<size_t>(strides_.first);
-        const size_t strideWidth = static_cast<size_t>(strides_.second);
-
-        size_t outputHeight = (padding_ == Padding::Same) ?
-            ((inputHeight + strideHeight - 1) / strideHeight) : ((inputHeight - kernelHeight) / strideHeight + 1);
-        size_t outputWidth = (padding_ == Padding::Same) ?
-            ((inputWidth + strideWidth - 1) / strideWidth) : ((inputWidth - kernelWidth) / strideWidth + 1);
-
-        const size_t numFilters = filters_;
-
-        // 2. Continuous spatial image flattening (Pure sequential speed)
-        NN::Math::Im2Col(source, convContext.columnsCache, kernelSize_, strides_, padding_);
-
-        // 3. Compute via GEMM using our perfectly cached pre-transposed weight matrix
-        NN::Math::MatrixMultiplication(convContext.columnsCache, transposedWeights_, source);
-
-        // 4. Accumulate Biases sequentially (Clean L1/L2 cache streaming)
-        float* outData = source.GetData().data();
-        const float* bData = biases_.GetData().data();
-        const size_t totalElements = source.GetSize();
-
-        for (size_t i = 0; i < totalElements; ++i)
-        {
-            outData[i] += bData[i % numFilters];
-        }
-
-        source.SetShape({ outputHeight, outputWidth, numFilters });
-
-        // 6. Snapshot the pre-activation state safely for the backward pass
-        /*convContext.preActivation.ReshapeAndResize(output.GetShape());
-        std::copy_n(outData, totalElements, convContext.preActivation.GetData().data());*/
-
-        // 7. Apply the activation function in-place directly on the destination scratch tensor
-        activation_.Apply(activationType_, source);
-    }
-
-    void Conv2D::BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
-    {
-        vector<WorkerPool::Job> jobs;
-        jobs.reserve(batchSize);
-
-        //For each image in the batch add it to the jobs list for the threads or workers to handle
-        for (size_t i = 0; i < batchSize; i++)
-        {
-            jobs.emplace_back([this, &batchGradients, &contexts, i](size_t workerIndex)
-                {
-                    //Forward pass using this worker's contexts.
-                    Backpropagate(batchGradients[i], *contexts[workerIndex], imageContexts_[i]);
-                });
-        }
-
-        workerPool.SubmitJobs(std::move(jobs));
-        workerPool.WaitForJobs();
-    }
-
-    void Conv2D::Backpropagate(Tensor& gradient, LayerContext& gradientContext, Conv2DImageContext& imageContext)
-    {
-        auto& convContext = dynamic_cast<Conv2DContext&>(gradientContext);
+        auto& convWorkerContext = dynamic_cast<Conv2DContext&>(workerContext);
+        auto& convImageContext = dynamic_cast<Conv2DImageContext&>(imageContext);
 
         // 1. Calculate the activation derivative.
-        activation_.ApplyDerivative(activationType_, imageContext.output, gradient, convContext.activationGradient);
+        activation_.ApplyDerivative(activationType_, convImageContext.output, gradient, convWorkerContext.activationGradient);
 
-        const auto& inputShape = imageContext.input.GetShape();
-        const auto outputShape = imageContext.output.GetShape();
+        const auto& inputShape = convImageContext.input.GetShape();
+        const auto outputShape = convImageContext.output.GetShape();
 
         const size_t inputHeight = inputShape[0];
         const size_t inputWidth = inputShape[1];
@@ -277,13 +237,13 @@ namespace NN::Layers
         const size_t patchSize = kernelHeight * kernelWidth * inputChannels;
 
         // 2. Recreate the input-patch matrix using the parallelized math implementation.
-        NN::Math::Im2Col(imageContext.input, convContext.columnsCache, kernelSize_, strides_, padding_);
+        NN::Math::Im2Col(convImageContext.input, convWorkerContext.columnsCache, kernelSize_, strides_, padding_);
 
         // Extract raw pointers for data-heavy operations
-        const float* outputGradData = convContext.activationGradient.GetData().data();
+        const float* outputGradData = convWorkerContext.activationGradient.GetData().data();
 
-        float* biasGradData = convContext.biasGradients.GetData().data();
-        float* weightGradData = convContext.weightGradients.GetData().data();
+        float* biasGradData = convWorkerContext.biasGradients.GetData().data();
+        float* weightGradData = convWorkerContext.weightGradients.GetData().data();
 
         // 3. Calculate bias gradients sequentiallytransposedGradCache
         for (size_t position = 0; position < outputPositions; position++)
@@ -296,8 +256,8 @@ namespace NN::Layers
         }
 
         // 5. Calculate weight gradients via Transposed Gradient Matrix Multiply.
-        convContext.transposedGradCache.ReshapeAndResize({ numFilters, outputPositions });
-        float* transposedGradData = convContext.transposedGradCache.GetData().data();
+        convWorkerContext.transposedGradCache.ReshapeAndResize({ numFilters, outputPositions });
+        float* transposedGradData = convWorkerContext.transposedGradCache.GetData().data();
 
 
         //#pragma omp parallel for collapse(2) schedule(static)
@@ -310,11 +270,11 @@ namespace NN::Layers
         }
 
         Tensor weightGradient({ numFilters, patchSize });
-        NN::Math::MatrixMultiplication(convContext.transposedGradCache, convContext.columnsCache, weightGradient);
+        NN::Math::MatrixMultiplication(convWorkerContext.transposedGradCache, convWorkerContext.columnsCache, weightGradient);
 
 
         // Accumulate weight gradient map natively
-        float* wGradDest = convContext.weightGradients.GetData().data();
+        float* wGradDest = convWorkerContext.weightGradients.GetData().data();
         const float* calculatedWeightGradData = weightGradient.GetData().data();
         const size_t wGradSize = weightGradient.GetSize();
 
@@ -328,25 +288,20 @@ namespace NN::Layers
         Tensor flatWeightsView({ numFilters, patchSize });
         flatWeightsView.GetData() = weights_.GetData();
 
-        convContext.activationGradient.SetShape({ outputPositions, numFilters });
+        convWorkerContext.activationGradient.SetShape({ outputPositions, numFilters });
 
         // Transpose weight tracking multiplication to retrieve the input patch gradients
         // flatActivationGradient shape: {outputPositions, numFilters}
         // flatWeights shape:            {numFilters, patchSize}
         // columnGradient shape:         {outputPositions, patchSize}
-        NN::Math::MatrixMultiplication(convContext.activationGradient, flatWeightsView, convContext.columnGradCache);
+        NN::Math::MatrixMultiplication(convWorkerContext.activationGradient, flatWeightsView, convWorkerContext.columnGradCache);
 
-        convContext.activationGradient.SetShape({ outputHeight, outputWidth, numFilters });
+        convWorkerContext.activationGradient.SetShape({ outputHeight, outputWidth, numFilters });
 
         // 7. Scatter patch gradients back into the original HWC input using the optimized Col2Im helper.
         // We pass the recycled 'gradient' buffer directly into the helper function, enabling it to steal
         // the memory context and perform an allocation-free array reduction.
-        NN::Math::Col2Im(convContext.columnGradCache, gradient, inputShape, kernelSize_, strides_, padding_);
-    }
-
-    void Conv2D::Backpropagate(Tensor& gradient, LayerContext& context)
-    {
-        throw std::invalid_argument("This Backpropagate is not implemented yet.");
+        NN::Math::Col2Im(convWorkerContext.columnGradCache, gradient, inputShape, kernelSize_, strides_, padding_);
     }
 
     void Conv2D::ApplyGradients(Optimizer& optimizer, int batchSize)
@@ -357,9 +312,9 @@ namespace NN::Layers
         UpdateTransposedWeightsCache();
     }
 
-    void Conv2D::ResetGradients(LayerContext& context)
+    void Conv2D::ResetGradients(WorkerContext& workerContext)
     {
-        auto& convContext = dynamic_cast<Conv2DContext&>(context);
+        auto& convContext = dynamic_cast<Conv2DContext&>(workerContext);
 
         // Reuse existing allocated memory blocks and clear elements to 0.0f in-place
         std::fill(convContext.weightGradients.GetData().begin(), convContext.weightGradients.GetData().end(), 0.0f);
@@ -369,9 +324,9 @@ namespace NN::Layers
         std::fill(biasGradients_.GetData().begin(), biasGradients_.GetData().end(), 0.0f);
     }
 
-    void Conv2D::AccumulateGradients(LayerContext& context)
+    void Conv2D::AccumulateGradients(WorkerContext& workerContext)
     {
-        auto& convContext = dynamic_cast<Conv2DContext&>(context);
+        auto& convContext = dynamic_cast<Conv2DContext&>(workerContext);
 
         float* wGradData = weightGradients_.GetData().data();
         const float* ctxWGradData = convContext.weightGradients.GetData().data();

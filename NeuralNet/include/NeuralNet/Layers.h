@@ -8,3 +8,4 @@
 #include <NeuralNet/Layers/Flatten.h>
 #include <NeuralNet/Layers/Dense.h>
 #include <NeuralNet/Layers/Dropout.h>
+#include <NeuralNet/Layers/BatchNormalization.h>

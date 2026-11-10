@@ -54,7 +54,7 @@ namespace NN::Models
         float learningRate_;
 
         //first index: which layer, second index: which worker.
-        std::vector<std::vector<std::unique_ptr<Layers::LayerContext>>> workerContexts_;
+        std::vector<std::vector<std::unique_ptr<Layers::WorkerContext>>> layerWorkerContexts_;
 
         //I want to hand over the inner vector of per layer
         //vector<Layers::WorkerContext> workers_;

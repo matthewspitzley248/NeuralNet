@@ -11,15 +11,20 @@ namespace NN::Layers
 		scale_ = 1 / (1 - dropoutRate);
 	}
 
-	unique_ptr<LayerContext> Dropout::CreateContext() const
+	unique_ptr<WorkerContext> Dropout::CreateWorkerContext() const
 	{
 		if (!randomGenerator_)
 			throw runtime_error("Dropout RNG has not been initialized.");
 
-		auto context = make_unique<DropoutContext>();
+		auto context = make_unique<DropoutWorkerContext>();
 		context->randomGenerator.seed((*randomGenerator_)());
 
 		return context;
+	}
+
+	unique_ptr<ImageContext> Dropout::CreateImageContext() const
+	{
+		return std::make_unique<DropoutImageContext>();
 	}
 
 	void Dropout::Initialize(std::mt19937& generator, const std::vector<size_t>& inputShape)
@@ -27,47 +32,20 @@ namespace NN::Layers
 		randomGenerator_ = &generator;
 	}
 
-	std::vector<size_t> Dropout::GetOutputShape(const std::vector<size_t>& inputShape)
+	std::vector<size_t> Dropout::GetOutputShape(const std::vector<size_t>& inputShape) const
 	{
 		return inputShape;
 	}
 
-	void Dropout::RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
+	void Dropout::Run(Tensor& data, WorkerContext& workerContext, ImageContext& imageContext)
 	{
-		vector<WorkerPool::Job> jobs;
-		jobs.reserve(batchSize);
+		auto& dropoutWorkerContext = dynamic_cast<DropoutWorkerContext&>(workerContext);
+		auto& dropoutImageContext = dynamic_cast<DropoutImageContext&>(imageContext);
 
-		imageContexts_.clear();
-		imageContexts_.resize(batchSize);
-		//imageContexts_.reserve(batchSize);
-
-		//For each image in the batch add it to the jobs list for the threads or workers to handle
-		for (size_t i = 0; i < batchSize; i++)
-		{
-			jobs.emplace_back([this, &batch, &contexts, i](size_t workerIndex)
-				{
-					ImageLabel& image = batch.imageLabels[i];
-
-					//Create a new Context for this image and add it to imageContexts
-					imageContexts_[i] = DropoutImageContext();
-
-					//Forward pass using this worker's contexts and image context
-					Run(image.image, *contexts[workerIndex], imageContexts_[i]);
-				});
-		}
-
-		workerPool.SubmitJobs(std::move(jobs));
-		workerPool.WaitForJobs();
-	}
-
-	void Dropout::Run(Tensor& source, LayerContext& gradientContext, DropoutImageContext& imageContext)
-	{
-		auto& context = dynamic_cast<DropoutContext&>(gradientContext);
-
-		const size_t size = source.GetSize();
+		const size_t size = data.GetSize();
 
 		//Resize mask to match the input tensor.
-		imageContext.dropoutMask.resize(size);
+		dropoutImageContext.dropoutMask.resize(size);
 
 		//No dropout during inference.
 		if (!training_)
@@ -77,53 +55,32 @@ namespace NN::Layers
 
 		uniform_real_distribution<float> distribution(0.0f, 1.0f);
 
-		float* data = source.GetData().data();
+		float* inData = data.GetData().data();
 
 		for (size_t i = 0; i < size; i++)
 		{
-			const bool keep = distribution(context.randomGenerator) >= dropoutRate_;
+			const bool keep = distribution(dropoutWorkerContext.randomGenerator) >= dropoutRate_;
 
-			imageContext.dropoutMask[i] = keep;
+			dropoutImageContext.dropoutMask[i] = keep;
 
 			if (keep)
 			{
-				data[i] *= scale_;
+				inData[i] *= scale_;
 			}
 			else
 			{
-				data[i] = 0.0f;
+				inData[i] = 0.0f;
 			}
 		}
 	}
 
-	void Dropout::Run(Tensor& source, LayerContext& context)
+	void Dropout::Backpropagate(Tensor& gradient, WorkerContext& workerContext, ImageContext& imageContext)
 	{
-	}
+		auto& dropoutImageContext = dynamic_cast<DropoutImageContext&>(imageContext);
 
-	void Dropout::BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
-	{
-		vector<WorkerPool::Job> jobs;
-		jobs.reserve(batchSize);
-
-		//For each image in the batch add it to the jobs list for the threads or workers to handle
-		for (size_t i = 0; i < batchSize; i++)
-		{
-			jobs.emplace_back([this, &batchGradients, &contexts, i](size_t workerIndex)
-				{
-					//pass using this worker's contexts.
-					Backpropagate(batchGradients[i], *contexts[workerIndex], imageContexts_[i]);
-				});
-		}
-
-		workerPool.SubmitJobs(std::move(jobs));
-		workerPool.WaitForJobs();
-	}
-
-	void Dropout::Backpropagate(Tensor& gradient, LayerContext& gradientContext, DropoutImageContext& imageContext)
-	{
 		const size_t size = gradient.GetSize();
 
-		if (imageContext.dropoutMask.size() != size)
+		if (dropoutImageContext.dropoutMask.size() != size)
 		{
 			throw runtime_error("Dropout mask size does not match gradient size.");
 		}
@@ -132,7 +89,7 @@ namespace NN::Layers
 
 		for (size_t i = 0; i < size; i++)
 		{
-			if (imageContext.dropoutMask[i])
+			if (dropoutImageContext.dropoutMask[i])
 			{
 				gradientData[i] *= scale_;
 			}
@@ -141,21 +98,5 @@ namespace NN::Layers
 				gradientData[i] = 0.0f;
 			}
 		}
-	}
-
-	void Dropout::Backpropagate(Tensor& gradient, LayerContext& context)
-	{
-	}
-
-	void Dropout::ApplyGradients(Optimizer& optimizer, int batchSize)
-	{
-	}
-
-	void Dropout::ResetGradients(LayerContext& context)
-	{
-	}
-
-	void Dropout::AccumulateGradients(LayerContext& context)
-	{
 	}
 }

@@ -129,6 +129,7 @@
     <ClInclude Include="include\NeuralNet\ImageDataGenerator.h" />
     <ClInclude Include="include\NeuralNet\ImageLoader.h" />
     <ClInclude Include="include\NeuralNet\Layers.h" />
+    <ClInclude Include="include\NeuralNet\Layers\BatchNormalization.h" />
     <ClInclude Include="include\NeuralNet\Layers\Conv2D.h" />
     <ClInclude Include="include\NeuralNet\Layers\Dense.h" />
     <ClInclude Include="include\NeuralNet\Layers\Dropout.h" />
@@ -153,6 +154,7 @@
     <ClCompile Include="src\Activation.cpp" />
     <ClCompile Include="src\ImageDataGenerator.cpp" />
     <ClCompile Include="src\ImageLoader.cpp" />
+    <ClCompile Include="src\Layers\BatchNormalization.cpp" />
     <ClCompile Include="src\Layers\Conv2D.cpp" />
     <ClCompile Include="src\Layers\Dense.cpp" />
     <ClCompile Include="src\Layers\Dropout.cpp" />

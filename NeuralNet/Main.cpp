@@ -213,8 +213,8 @@ int main()
     model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Valid);
 
     model.Add<Flatten>();
-    model.Add<Dense>(100, ActivationType::Relu);
-    model.Add<Dense>(100, ActivationType::Relu);
+    model.Add<Dense>(50, ActivationType::Relu);
+    model.Add<Dense>(50, ActivationType::Relu);
     model.Add<Dropout>(0.25f);
     //output layer
     model.Add<Dense>(trainImageGen.GetLabelSize(), ActivationType::Softmax);

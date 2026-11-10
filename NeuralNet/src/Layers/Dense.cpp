@@ -8,14 +8,19 @@ namespace NN::Layers
     {
     }
 
-    unique_ptr<LayerContext> Dense::CreateContext() const
+    unique_ptr<WorkerContext> Dense::CreateWorkerContext() const
     {
-        auto context = make_unique<DenseContext>();
+        auto context = make_unique<DenseWorkerContext>();
 
         context->weightGradients = Tensor(weights_.GetShape());
         context->biasGradients = Tensor(biases_.GetShape());
 
         return context;
+    }
+
+    unique_ptr<ImageContext> Dense::CreateImageContext() const
+    {
+        return std::make_unique<DenseImageContext>();
     }
 
     void Dense::Initialize(mt19937& generator, const vector<size_t>& inputShape)
@@ -54,84 +59,17 @@ namespace NN::Layers
         biasGradients_ = Tensor(biases_.GetShape());
     }
 
-    std::vector<size_t> Dense::GetOutputShape(const std::vector<size_t>& inputShape)
+    std::vector<size_t> Dense::GetOutputShape(const std::vector<size_t>& inputShape) const
     {
         return {units_};
     }
 
-    void Dense::RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
-    {
-        vector<WorkerPool::Job> jobs;
-        jobs.reserve(batchSize);
-
-        imageContexts_.clear();
-        imageContexts_.resize(batchSize);
-        //imageContexts_.reserve(batchSize);
-
-        //For each image in the batch add it to the jobs list for the threads or workers to handle
-        for (size_t i = 0; i < batchSize; i++)
-        {
-            jobs.emplace_back([this, &batch, &contexts, i](size_t workerIndex)
-                {
-                    ImageLabel& image = batch.imageLabels[i];
-
-                    //Create a new Context for this image and add it to imageContexts
-                    imageContexts_[i] = DenseImageContext();
-
-                    //Forward pass using this worker's contexts and image context
-                    Run(image.image, *contexts[workerIndex], imageContexts_[i]);
-                });
-        }
-
-        workerPool.SubmitJobs(std::move(jobs));
-        workerPool.WaitForJobs();
-    }
-
-    void Dense::Run(Tensor& source, LayerContext& gradientContext, DenseImageContext& imageContext)
-    {
-        const size_t inputSize = source.GetSize();
-        imageContext.input.ReshapeAndResize(source.GetShape());
-        std::copy_n(source.GetData().data(), inputSize, imageContext.input.GetData().data());
-
-        // Resize input to hold the output.
-        source.ReshapeAndResize({ units_ });
-
-        const float* xData = imageContext.input.GetData().data();
-        const float* wData = weights_.GetData().data();
-        const float* bData = biases_.GetData().data();
-        float* outData = source.GetData().data();
-
-        // Pure sequential execution loop: easily auto-vectorized by the compiler
-        for (size_t neuron = 0; neuron < units_; neuron++)
-        {
-            float sum = 0.0f;
-            const size_t weightOffset = neuron * inputSize;
-
-            for (size_t size = 0; size < inputSize; size++)
-            {
-                sum += xData[size] * wData[weightOffset + size];
-            }
-
-            outData[neuron] = sum + bData[neuron];
-        }
-
-        // Capture the pre-activation state snapshot for the backward pass safely
-        //denseContext.preActivation.ReshapeAndResize(output.GetShape());
-        //std::copy_n(outData, units_, denseContext.preActivation.GetData().data());
-
-        // Apply the activation directly onto the destination
-        activation_.Apply(activationType_, source);
-
-        imageContext.output.ReshapeAndResize(source.GetShape());
-        std::copy_n(outData, units_, imageContext.output.GetData().data());
-    }
-
-    void Dense::Run(Tensor& source, LayerContext& context)
+    void Dense::Run(Tensor& source)
     {
         const size_t inputSize = source.GetSize();
 
-        Tensor input(source.GetShape()); 
-        std::copy_n(source.GetData().data(),inputSize, input.GetData().data());
+        Tensor input(source.GetShape());
+        std::copy_n(source.GetData().data(), inputSize, input.GetData().data());
 
         Tensor output({ units_ });
 
@@ -158,46 +96,70 @@ namespace NN::Layers
         source = std::move(output);
     }
 
-    void Dense::BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<LayerContext>>& contexts, WorkerPool& workerPool)
-    {
-        vector<WorkerPool::Job> jobs;
-        jobs.reserve(batchSize);
 
-        //For each image in the batch add it to the jobs list for the threads or workers to handle
-        for (size_t i = 0; i < batchSize; i++)
+    void Dense::Run(Tensor& data, WorkerContext& workerContext, ImageContext& imageContext)
+    {
+        auto& denseImageContext = dynamic_cast<DenseImageContext&>(imageContext);
+
+        const size_t inputSize = data.GetSize();
+        denseImageContext.input.ReshapeAndResize(data.GetShape());
+        std::copy_n(data.GetData().data(), inputSize, denseImageContext.input.GetData().data());
+
+        // Resize input to hold the output.
+        data.ReshapeAndResize({ units_ });
+
+        const float* xData = denseImageContext.input.GetData().data();
+        const float* wData = weights_.GetData().data();
+        const float* bData = biases_.GetData().data();
+        float* outData = data.GetData().data();
+
+        // Pure sequential execution loop: easily auto-vectorized by the compiler
+        for (size_t neuron = 0; neuron < units_; neuron++)
         {
-            jobs.emplace_back([this, &batchGradients, &contexts, i](size_t workerIndex)
-                {
-                    //pass using this worker's contexts.
-                    Backpropagate(batchGradients[i], *contexts[workerIndex], imageContexts_[i]);
-                });
+            float sum = 0.0f;
+            const size_t weightOffset = neuron * inputSize;
+
+            for (size_t size = 0; size < inputSize; size++)
+            {
+                sum += xData[size] * wData[weightOffset + size];
+            }
+
+            outData[neuron] = sum + bData[neuron];
         }
 
-        workerPool.SubmitJobs(std::move(jobs));
-        workerPool.WaitForJobs();
+        // Capture the pre-activation state snapshot for the backward pass safely
+        //denseContext.preActivation.ReshapeAndResize(output.GetShape());
+        //std::copy_n(outData, units_, denseContext.preActivation.GetData().data());
+
+        // Apply the activation directly onto the destination
+        activation_.Apply(activationType_, data);
+
+        denseImageContext.output.ReshapeAndResize(data.GetShape());
+        std::copy_n(outData, units_, denseImageContext.output.GetData().data());
     }
 
-    void Dense::Backpropagate(Tensor& gradient, LayerContext& gradientContext, DenseImageContext& imageContext)
+    void Dense::Backpropagate(Tensor& gradient, WorkerContext& workerContext, ImageContext& imageContext)
     {
-        auto& denseContext = dynamic_cast<DenseContext&>(gradientContext);
+        auto& denseWorkerContext = dynamic_cast<DenseWorkerContext&>(workerContext);
+        auto& denseImageContext = dynamic_cast<DenseImageContext&>(imageContext);
 
         // Calculate activation derivatives natively into a cached tracking variable
         // inside context, or let ApplyDerivative write into a pre-allocated field.
 
         //Tensor activationGradient;
 
-        activation_.ApplyDerivative(activationType_, imageContext.output, gradient, denseContext.activationGradient);
+        activation_.ApplyDerivative(activationType_, denseImageContext.output, gradient, denseWorkerContext.activationGradient);
 
-        const size_t inputSize = imageContext.input.GetSize();
+        const size_t inputSize = denseImageContext.input.GetSize();
 
-        gradient.ReshapeAndResize(imageContext.input.GetShape());
+        gradient.ReshapeAndResize(denseImageContext.input.GetShape());
 
-        const float* actGradData = denseContext.activationGradient.GetData().data();
-        const float* inputData = imageContext.input.GetData().data();
+        const float* actGradData = denseWorkerContext.activationGradient.GetData().data();
+        const float* inputData = denseImageContext.input.GetData().data();
         const float* wData = weights_.GetData().data();
 
-        float* biasGradData = denseContext.biasGradients.GetData().data();
-        float* weightGradData = denseContext.weightGradients.GetData().data();
+        float* biasGradData = denseWorkerContext.biasGradients.GetData().data();
+        float* weightGradData = denseWorkerContext.weightGradients.GetData().data();
         float* gradData = gradient.GetData().data();
 
         std::fill_n(gradData, inputSize, 0.0f);
@@ -219,11 +181,6 @@ namespace NN::Layers
         }
     }
 
-    void Dense::Backpropagate(Tensor& gradient, LayerContext& context)
-    {
-        throw std::invalid_argument("This Backpropagate is not implemented yet.");
-    }
-
     void Dense::ApplyGradients(Optimizer& optimizer, int batchSize)
     {
 
@@ -239,9 +196,9 @@ namespace NN::Layers
     }
 
 
-    void Dense::ResetGradients(LayerContext& context)
+    void Dense::ResetGradients(WorkerContext& workerContext)
     {
-        auto& denseContext = dynamic_cast<DenseContext&>(context);
+        auto& denseContext = dynamic_cast<DenseWorkerContext&>(workerContext);
 
         // Reuse existing allocated memory blocks and clear elements to 0.0f in-place
         std::fill(denseContext.weightGradients.GetData().begin(), denseContext.weightGradients.GetData().end(), 0.0f);
@@ -251,9 +208,9 @@ namespace NN::Layers
         std::fill(biasGradients_.GetData().begin(), biasGradients_.GetData().end(), 0.0f);
     }
 
-    void Dense::AccumulateGradients(LayerContext& context)
+    void Dense::AccumulateGradients(WorkerContext& workerContext)
     {
-        auto& denseContext = dynamic_cast<DenseContext&>(context);
+        auto& denseContext = dynamic_cast<DenseWorkerContext&>(workerContext);
 
         // Extract raw pointers for contiguous data processing
         float* wGradData = weightGradients_.GetData().data();

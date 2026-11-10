@@ -84,6 +84,9 @@
     <ClInclude Include="include\NeuralNet\Layers\Dropout.h">
       <Filter>Header Files\Layers</Filter>
     </ClInclude>
+    <ClInclude Include="include\NeuralNet\Layers\BatchNormalization.h">
+      <Filter>Header Files\Layers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\NeuralNet.cpp">
@@ -138,6 +141,9 @@
       <Filter>Source Files\Layers</Filter>
     </ClCompile>
     <ClCompile Include="src\Layers\Dropout.cpp">
+      <Filter>Source Files\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Layers\BatchNormalization.cpp">
       <Filter>Source Files\Layers</Filter>
     </ClCompile>
   </ItemGroup>

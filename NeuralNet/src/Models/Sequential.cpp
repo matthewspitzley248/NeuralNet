@@ -81,7 +81,7 @@ namespace NN::Models
                 //Will want to have it so it gos through all layers until it hits a layer that wants a stop (batch normalization) and loop that 
                 for (size_t i = 0; i < layers_.size(); i++)
                 {
-                    layers_[i]->RunBatch(batch, batchSize, workerContexts_[i], workerPool_);
+                    layers_[i]->RunBatch(batch, batchSize, layerWorkerContexts_[i], workerPool_);
 
                     workerPool_.WaitForJobs();
                 }
@@ -117,7 +117,7 @@ namespace NN::Models
                 //Now each layer handles its own Backpropagate same as run
                 for (size_t i = layers_.size(); i > 0; i--)
                 {
-                    layers_[i - 1]->BackpropagateBatch(batchGradients, batchSize, workerContexts_[i - 1], workerPool_);
+                    layers_[i - 1]->BackpropagateBatch(batchGradients, batchSize, layerWorkerContexts_[i - 1], workerPool_);
 
                     workerPool_.WaitForJobs();
                 }
@@ -160,17 +160,6 @@ namespace NN::Models
         printf("\n[Fit] Training finished.\n");
     }
 
-    void Sequential::SetTraining(bool training)
-    {
-        training_ = training;
-
-        for (auto& layer : layers_)
-        {
-            layer->SetTraining(training);
-        }
-
-    }
-
     float Sequential::Evaluate(ImageDataGenerator& testData)
     {
         SetTraining(false);
@@ -187,7 +176,7 @@ namespace NN::Models
 
             for (size_t i = 0; i < layers_.size(); i++)
             {
-                layers_[i]->RunBatch(batch, batchSize, workerContexts_[i], workerPool_);
+                layers_[i]->RunBatch(batch, batchSize, layerWorkerContexts_[i], workerPool_);
 
                 workerPool_.WaitForJobs();
             }
@@ -250,17 +239,17 @@ namespace NN::Models
     void Sequential::CreateWorkers(int workerCount)
     {
         //Remove existing workers and recreate with the size
-        workerContexts_.clear();
-        workerContexts_.resize(layers_.size());
+        layerWorkerContexts_.clear();
+        layerWorkerContexts_.resize(layers_.size());
 
         for (size_t i = 0; i < layers_.size(); i++)
         {
-            auto& contexts = workerContexts_[i];
+            auto& contexts = layerWorkerContexts_[i];
             contexts.reserve(workerCount);
 
             for (int j = 0; j < workerCount; j++)
             {
-                contexts.push_back(layers_[i]->CreateContext());
+                contexts.push_back(layers_[i]->CreateWorkerContext());
             }
         }
 
@@ -272,7 +261,7 @@ namespace NN::Models
     {
         for (size_t layerIndex = 0; layerIndex < layers_.size(); ++layerIndex)
         {
-            for (auto& context : workerContexts_[layerIndex])
+            for (auto& context : layerWorkerContexts_[layerIndex])
             {
                 layers_[layerIndex]->ResetGradients(*context);
             }
@@ -288,7 +277,7 @@ namespace NN::Models
         {
             jobs.emplace_back([this, i](size_t workerIndex)
                 {
-                    for (auto& context : workerContexts_[i])
+                    for (auto& context : layerWorkerContexts_[i])
                     {
                         layers_[i]->AccumulateGradients(*context);
                     }
@@ -324,7 +313,16 @@ namespace NN::Models
         }
     }
 
+    void Sequential::SetTraining(bool training)
+    {
+        training_ = training;
 
+        for (auto& layer : layers_)
+        {
+            layer->SetTraining(training);
+        }
+
+    }
 
 
     void Sequential::PrintProgress(size_t currentBatch, size_t totalBatches, double averageBatchSeconds)
