@@ -206,11 +206,13 @@ int main()
     //model.Add<Conv2D>(25, pair{ 5, 5 }, pair{ 1, 1 }, ActivationType::Relu, Padding::Same);
     model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 },  Padding::Same);
 
-    //model.Add<Conv2D>(50, pair{ 5, 5 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
+    model.Add<Conv2D>(50, pair{ 5, 5 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
     model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Same);
+    model.Add<BatchNormalization>();
 
     model.Add<Conv2D>(70, pair{ 3, 3 }, pair{ 2, 2 }, ActivationType::Relu, Padding::Same);
     model.Add<MaxPool2D>(pair{ 2, 2 }, pair{ 2, 2 }, Padding::Valid);
+    model.Add<BatchNormalization>();
 
     model.Add<Flatten>();
     model.Add<Dense>(50, ActivationType::Relu);
@@ -224,5 +226,5 @@ int main()
     //Need to get some sort of early stop and reduce learning rate for the model
 
     //model fit to train it
-    model.Fit(10, trainImageGen, testImageGen);
+    model.Fit(50, trainImageGen, testImageGen);
 }

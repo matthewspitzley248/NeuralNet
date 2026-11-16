@@ -20,6 +20,8 @@ namespace NN::Layers
     public:
         MaxPool2D(std::pair<size_t, size_t> poolSize = { 2, 2 }, std::pair<size_t, size_t> strides = { 0, 0 }, Padding padding = Padding::Valid);
 
+        unique_ptr<ImageContext> CreateImageContext() const override;
+
         void Initialize(std::mt19937& generator, const std::vector<size_t>& inputShape) override;
 
         std::vector<size_t> GetOutputShape(const std::vector<size_t>& inputShape) const override;
@@ -29,7 +31,6 @@ namespace NN::Layers
     protected:
         void Run(Tensor& data, WorkerContext& workerContext, ImageContext& imageContext) override;
         void Backpropagate(Tensor& gradient, WorkerContext& workerContext, ImageContext& imageContext) override;
-        unique_ptr<ImageContext> CreateImageContext() const override;
 
 
         std::pair<size_t, size_t> poolSize_; 

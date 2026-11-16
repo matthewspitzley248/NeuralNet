@@ -26,16 +26,30 @@ namespace NN::Layers
         virtual ~Layer() = default;
 
         virtual unique_ptr<WorkerContext> CreateWorkerContext() const;
+        virtual unique_ptr<ImageContext> CreateImageContext() const;
 
         virtual void Initialize(mt19937& generator, const vector<size_t>& inputShape) = 0;
         virtual vector<size_t> GetOutputShape(const vector<size_t>& inputShape) const = 0;
+
+
         virtual void RunBatch(ImageBatch& batch, const size_t batchSize, std::vector<std::unique_ptr<WorkerContext>>& workerContexts, WorkerPool& workerPool);
+
+        /// <summary>
+        /// Runs Tensor with no contexts.
+        /// Made for functions like evaluate
+        /// </summary>
+        /// <param name="batch">Batch of images to run</param>
+        /// <param name="batchSize">Number of images in the batch</param>
+        /// <param name="workerPool">Pool of workers to create jobs for</param>
+        virtual void RunBatch(ImageBatch& batch, const size_t batchSize, WorkerPool& workerPool);
         /// <summary>
         /// Clean pure Run function. Not for use with learning or training
         /// </summary>
         /// <param name="data">input to run, sets it with the output</param>
         virtual void Run(Tensor& data);
+
         virtual void BackpropagateBatch(vector<Tensor>& batchGradients, const size_t batchSize, std::vector<std::unique_ptr<WorkerContext>>& workerContexts, WorkerPool& workerPool);
+
         virtual void ApplyGradients(Optimizer& optimizer, int batchSize);
         virtual void ResetGradients(WorkerContext& workerContext);
         virtual void AccumulateGradients(WorkerContext& workerContext);
@@ -49,7 +63,6 @@ namespace NN::Layers
         //for batch methods to run
         virtual void Run(Tensor& data, WorkerContext& workerContext, ImageContext& imageContext);
         virtual void Backpropagate(Tensor& gradient, WorkerContext& workerContext, ImageContext& imageContext) = 0;
-        virtual unique_ptr<ImageContext> CreateImageContext() const;
 
         std::vector<std::unique_ptr<ImageContext>> imageContexts_;
 

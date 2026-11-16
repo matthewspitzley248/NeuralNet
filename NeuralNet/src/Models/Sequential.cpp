@@ -176,7 +176,8 @@ namespace NN::Models
 
             for (size_t i = 0; i < layers_.size(); i++)
             {
-                layers_[i]->RunBatch(batch, batchSize, layerWorkerContexts_[i], workerPool_);
+                layers_[i]->RunBatch(batch, batchSize, workerPool_);
+                //layers_[i]->RunBatch(batch, batchSize, layerWorkerContexts_[i], workerPool_);
 
                 workerPool_.WaitForJobs();
             }

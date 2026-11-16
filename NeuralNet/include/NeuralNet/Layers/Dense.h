@@ -32,6 +32,7 @@ namespace NN::Layers
         Dense(int units, ActivationType activationType = ActivationType::None);
 
         unique_ptr<WorkerContext> CreateWorkerContext() const override;
+        unique_ptr<ImageContext> CreateImageContext() const override;
 
         void Initialize(std::mt19937& generator, const std::vector<size_t>& inputShape) override;
 
@@ -48,7 +49,6 @@ namespace NN::Layers
     protected:
         void Run(Tensor& data, WorkerContext& workerContext, ImageContext& imageContext) override;
         void Backpropagate(Tensor& gradient, WorkerContext& workerContext, ImageContext& imageContext) override;
-        unique_ptr<ImageContext> CreateImageContext() const override;
 
         size_t units_;
         ActivationType activationType_;

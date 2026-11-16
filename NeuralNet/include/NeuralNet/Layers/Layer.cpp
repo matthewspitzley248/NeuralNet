@@ -44,6 +44,27 @@ namespace NN::Layers
 		//printf("[Layer %p] Forward complete - Batch: %zu, Contexts: %zu\n", this, batchSize, imageContexts_.size());
 	}
 
+	void Layers::Layer::RunBatch(ImageBatch& batch, const size_t batchSize, WorkerPool& workerPool)
+	{
+		vector<WorkerPool::Job> jobs;
+		jobs.reserve(batchSize);
+
+		//For each image in the batch add it to the jobs list for the threads or workers to handle
+		for (size_t i = 0; i < batchSize; i++)
+		{
+			jobs.emplace_back([this, &batch, i](size_t workerIndex)
+				{
+					ImageLabel& image = batch.imageLabels[i];
+
+					//Forward pass
+					Run(image.image);
+				});
+		}
+
+		workerPool.SubmitJobs(std::move(jobs));
+		workerPool.WaitForJobs();
+	}
+
 	void Layer::Run(Tensor& data, WorkerContext& workerContext, ImageContext& imageContext)
 	{
 	}
